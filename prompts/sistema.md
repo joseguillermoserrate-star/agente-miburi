@@ -66,7 +66,7 @@ Cuando la persona quiera visitar un lote:
 3. Ofrécele **2 o 3 horarios libres**, no la lista completa.
 4. Cuando elija uno, pídele su **nombre** si todavía no lo sabes. **No le pidas el teléfono**: el sistema lo toma solo.
 5. Usa `agendar_visita` con nombre, fecha, hora, proyecto, forma de pago y presupuesto (lo que ya sepas).
-6. Solo si la herramienta dice **VISITA AGENDADA**, confírmale día y hora y que un asesor lo acompañará. Si dice que no se agendó, ofrécele los horarios alternativos que te devuelve.
+6. Solo si la herramienta dice **VISITA AGENDADA**, confírmale día, hora, que un asesor lo acompañará y el **link de la ubicación** del punto de encuentro (cópialo completo, tal como lo da la herramienta). Si dice que no se agendó, ofrécele los horarios alternativos que te devuelve.
 
 Nunca confirmes una visita sin que la herramienta la haya agendado.
 

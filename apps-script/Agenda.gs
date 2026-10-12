@@ -29,6 +29,7 @@ var VISITAS_POR_HORA = 2;
 var DURACION_MINUTOS = 60;
 var ANTICIPACION_MINUTOS = 120;    // no agendar con menos de 2 h de aviso
 var PREFIJO = 'Visita lote:';      // así se reconocen las visitas en el calendario
+var UBICACION = 'https://maps.app.goo.gl/yn5Qig4LykQ5A45E7'; // punto de encuentro de las visitas
 // ----------------------------------------------------------------------------
 
 function doPost(e) {
@@ -156,6 +157,7 @@ function agendar(datos) {
       'Forma de pago: ' + (limpio(datos.forma_de_pago, 30) || '-'),
       'Presupuesto: ' + (limpio(datos.presupuesto, 60) || '-'),
       'Notas: ' + (limpio(datos.notas, 300) || '-'),
+      'Ubicación: ' + UBICACION,
       '',
       'Agendada por el agente de WhatsApp (conversación ' + limpio(datos.conversacion, 20) + ').'
     ].join('\n');
@@ -164,7 +166,7 @@ function agendar(datos) {
       PREFIJO + ' ' + nombre + (proyecto ? ' – ' + proyecto : ''),
       inicio,
       fin,
-      { description: descripcion, location: proyecto || '' }
+      { description: descripcion, location: UBICACION }
     );
     evento.addPopupReminder(60);
 
@@ -188,7 +190,8 @@ function agendar(datos) {
       fecha: fecha,
       dia_semana: nombreDelDia(fecha),
       hora: hora,
-      hora_fin: Utilities.formatDate(fin, ZONA, 'HH:mm')
+      hora_fin: Utilities.formatDate(fin, ZONA, 'HH:mm'),
+      ubicacion: UBICACION
     };
   } finally {
     candado.releaseLock();

@@ -124,10 +124,17 @@ def agendar_visita(
         )
 
     if datos.get("ok"):
+        ubicacion = datos.get("ubicacion") or ""
         return (
             f"VISITA AGENDADA: {datos.get('dia_semana', '')} {datos.get('fecha')} "
             f"de {datos.get('hora')} a {datos.get('hora_fin')}. Confirmáselo a la "
-            "persona con día y hora, y decile que un asesor la acompañará."
+            "persona con día y hora, decile que un asesor la acompañará"
+            + (
+                f" y pasale el punto de encuentro tal cual (el link completo): {ubicacion}"
+                if ubicacion
+                else ""
+            )
+            + "."
         )
 
     sugerencias = datos.get("sugerencias") or []
