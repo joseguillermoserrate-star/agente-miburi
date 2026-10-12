@@ -128,9 +128,11 @@ def agendar_visita(
         return (
             f"VISITA AGENDADA: {datos.get('dia_semana', '')} {datos.get('fecha')} "
             f"de {datos.get('hora')} a {datos.get('hora_fin')}. Confirmáselo a la "
-            "persona con día y hora, decile que un asesor la acompañará"
+            "persona con día y hora, y decile textualmente: «"
+            + _aviso_del_ejecutivo()
+            + "»"
             + (
-                f" y pasale el punto de encuentro tal cual (el link completo): {ubicacion}"
+                f". Pasale también el punto de encuentro tal cual (el link completo): {ubicacion}"
                 if ubicacion
                 else ""
             )
@@ -180,7 +182,8 @@ def reagendar_visita(nueva_fecha: str, nueva_hora: str, config: RunnableConfig =
         return (
             f"VISITA REAGENDADA: antes {datos.get('antes')}, ahora "
             f"{datos.get('dia_semana', '')} {datos.get('fecha')} de {datos.get('hora')} "
-            f"a {datos.get('hora_fin')}. Confirmáselo con el nuevo día y hora"
+            f"a {datos.get('hora_fin')}. Confirmáselo con el nuevo día y hora, "
+            "decile textualmente: «" + _aviso_del_ejecutivo() + "»"
             + (f" y recordale el punto de encuentro: {ubicacion}" if ubicacion else "")
             + "."
         )
@@ -195,6 +198,15 @@ HERRAMIENTAS_DE_AGENDA = [consultar_disponibilidad, agendar_visita, reagendar_vi
 
 
 # -- Por dentro -------------------------------------------------------------
+
+
+def _aviso_del_ejecutivo() -> str:
+    """Quién va a atender la visita. EJECUTIVO_VENTAS lo cambia sin tocar código."""
+    nombre = (os.getenv("EJECUTIVO_VENTAS") or "Juan de Dios Rodríguez").strip()
+    return (
+        f"El ejecutivo de ventas asignado será {nombre}, quien se contactará "
+        "con usted para confirmar su visita."
+    )
 
 
 def _pedir(cuerpo: dict, exigir_ok: bool = True) -> dict:
