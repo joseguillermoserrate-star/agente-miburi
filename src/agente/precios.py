@@ -62,6 +62,7 @@ def consultar_lotes(
     proyecto: str = "",
     cantidad_de_opciones: int = OPCIONES_POR_DEFECTO,
     incluir_no_disponibles: bool = False,
+    cliente_pide_mejor_precio: bool = False,
 ) -> str:
     """Busca en la lista de precios ACTUALIZADA las opciones de lotes que mejor
     le encajan a la persona, según cómo quiere pagar y cuánto tiene.
@@ -85,6 +86,11 @@ def consultar_lotes(
         cantidad_de_opciones: Cuántas opciones devolver (1 a 5). Por defecto 3.
         incluir_no_disponibles: True solo si preguntan específicamente por
             lotes reservados o vendidos.
+        cliente_pide_mejor_precio: True SOLO si la persona, al contado, pidió
+            explícitamente un mejor precio o descuento ("¿me hace un mejor
+            precio?", "¿hay más descuento?", "¿no hay algo más barato?",
+            "está caro"). Nunca lo pongas en True por tu cuenta ni en la
+            primera consulta. Con True aparece el descuento especial.
     """
     try:
         filas = _traer_filas()
@@ -125,7 +131,10 @@ def consultar_lotes(
         )
 
     def contado(f):
-        return _precios_contado(f)[0]
+        # Con el descuento especial solo si lo pidió: si no, el presupuesto se
+        # compara con el precio que de verdad se le va a ofrecer.
+        inicial, especial = _precios_contado(f)
+        return especial if cliente_pide_mejor_precio else inicial
 
     def cuota(f):
         return _numero(f.get("cuota_mensual_usd"))
@@ -169,7 +178,7 @@ def consultar_lotes(
             + (" por mes." if forma == "plazo" else " para invertir.")
         )
 
-    unicas = list(dict.fromkeys(_redactar(f, forma) for f in elegidas))
+    unicas = list(dict.fromkeys(_redactar(f, forma, cliente_pide_mejor_precio) for f in elegidas))
     lineas = encabezado + unicas[:cantidad]
     if len(unicas) > cantidad:
         resto = len(unicas) - cantidad
@@ -183,9 +192,12 @@ def consultar_lotes(
             "LISTA, y que al contado tiene un descuento del porcentaje inicial, "
             "quedando en el precio con descuento. Ejemplo: «Lote de 300 m² en Villa "
             "Real V: precio de lista USD 16.500; al contado tiene un 30% de descuento, "
-            "quedando en USD 11.550». Nunca des solo el precio con descuento. "
-            "El descuento máximo es solo si la persona pide un mejor precio al "
-            "contado; nunca lo ofrezcas de entrada."
+            "quedando en USD 11.550». Nunca des solo el precio con descuento."
+        )
+    if forma != "plazo" and cliente_pide_mejor_precio:
+        lineas.append(
+            "La persona pidió mejor precio: presentá el PRECIO ESPECIAL como un "
+            "esfuerzo de la empresa y precio final. No hay descuento mayor."
         )
     return "\n".join(lineas)
 
@@ -261,7 +273,7 @@ def _precios_contado(f: dict) -> tuple[float, float]:
     return lista * (1 - inicial), lista * (1 - maximo)
 
 
-def _redactar(f: dict, forma: str = "") -> str:
+def _redactar(f: dict, forma: str = "", mejor_precio: bool = False) -> str:
     """Una línea por opción, en texto: menos chances de que el modelo se confunda.
 
     Solo con los datos de la forma de pago que eligió la persona: si quiere a
@@ -283,10 +295,12 @@ def _redactar(f: dict, forma: str = "") -> str:
                 f"al contado tiene {_pct(inicial)} de descuento, quedando en "
                 f"USD {_formato(contado_inicial)}"
             )
-        if maximo > inicial:
+        # El descuento especial no se le muestra al modelo hasta que la
+        # persona lo pide: lo que el modelo no ve, no lo puede regalar.
+        if mejor_precio and maximo > inicial:
             partes.append(
-                f"(descuento máximo autorizado {_pct(maximo)}: USD {_formato(contado_maximo)}, "
-                "solo si pide mejor precio)"
+                f"PRECIO ESPECIAL (porque pidió mejor precio): {_pct(maximo)} de "
+                f"descuento, quedando en USD {_formato(contado_maximo)}. Es el precio final."
             )
     if forma != "contado" and f.get("plazo_anios"):
         if forma == "plazo":
