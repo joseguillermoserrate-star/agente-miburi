@@ -24,6 +24,8 @@ permite enchufarlo a cualquier canal sin tocar una línea de acá adentro.
 
 from __future__ import annotations
 
+import os
+
 from dataclasses import dataclass
 from typing import Iterator
 
@@ -174,6 +176,9 @@ class Agente:
         simplemente no se cachea.
         """
         texto = leer_prompt(self.config.prompt_sistema)
+        # La fecha va aparte y al final: así la parte fija sigue idéntica de
+        # un mensaje a otro y el caché del proveedor la aprovecha igual.
+        fecha = _ahora_en_palabras()
 
         if self.config.cache and self.config.proveedor == "claude":
             return SystemMessage(
@@ -182,11 +187,12 @@ class Agente:
                         "type": "text",
                         "text": texto,
                         "cache_control": {"type": "ephemeral"},
-                    }
+                    },
+                    {"type": "text", "text": fecha},
                 ]
             )
 
-        return SystemMessage(texto)
+        return SystemMessage(f"{texto}\n\n{fecha}")
 
     # -- Lo que usa todo el mundo --------------------------------------------
 
@@ -388,4 +394,35 @@ def _a_respuesta(mensaje, modelo_por_defecto: str) -> Respuesta:
         tokens_salida=uso.get("output_tokens", 0),
         tokens_cache_leidos=detalle.get("cache_read", 0),
         tokens_cache_guardados=detalle.get("cache_creation", 0),
+    )
+
+
+_DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+_MESES = [
+    "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
+    "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+]
+
+
+def _ahora_en_palabras() -> str:
+    """La fecha y la hora de hoy, para que el modelo entienda "mañana" o "el sábado".
+
+    Sin esto el modelo no sabe qué día es, y agendar una visita se vuelve
+    adivinar. La zona sale de ZONA_HORARIA (por defecto, Bolivia).
+    """
+    from datetime import datetime, timedelta, timezone
+
+    zona_nombre = (os.getenv("ZONA_HORARIA") or "America/La_Paz").strip()
+    try:
+        from zoneinfo import ZoneInfo
+
+        zona = ZoneInfo(zona_nombre)
+    except Exception:
+        # Imagen sin base de zonas horarias: Bolivia es UTC-4 todo el año.
+        zona = timezone(timedelta(hours=-4))
+    ahora = datetime.now(zona)
+    return (
+        f"Fecha y hora actual: {_DIAS[ahora.weekday()]} {ahora.day} de "
+        f"{_MESES[ahora.month - 1]} de {ahora.year}, {ahora:%H:%M} "
+        f"(hoy es {ahora:%Y-%m-%d})."
     )

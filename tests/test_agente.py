@@ -205,7 +205,9 @@ def test_el_prompt_sale_del_archivo():
 
     entrada = a._armar_entrada({"messages": []})
 
-    assert entrada[0].content == leer_prompt(a.config.prompt_sistema)
+    assert entrada[0].content.startswith(leer_prompt(a.config.prompt_sistema))
+    # y al final, la fecha de hoy (para "mañana", "el sábado", etc.)
+    assert "Fecha y hora actual" in entrada[0].content
 
 
 def test_con_cache_el_prompt_va_marcado_para_claude():
