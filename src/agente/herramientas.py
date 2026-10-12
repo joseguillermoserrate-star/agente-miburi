@@ -31,6 +31,8 @@ import urllib.request
 
 from langchain_core.tools import tool
 
+from .precios import consultar_lotes
+
 GEOCODING = "https://geocoding-api.open-meteo.com/v1/search"
 PRONOSTICO = "https://api.open-meteo.com/v1/forecast"
 
@@ -114,7 +116,7 @@ def clima(lugar: str) -> str:
 
 # Lo que el agente tiene atado. Cuando agregues otra herramienta, sumala acá:
 # es la única lista que mira el grafo.
-HERRAMIENTAS = [clima]
+HERRAMIENTAS = [clima, consultar_lotes]
 
 
 # -- Las consultas ------------------------------------------------------------
