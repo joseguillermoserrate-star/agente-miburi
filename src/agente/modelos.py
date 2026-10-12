@@ -19,6 +19,7 @@ requirements.txt los paquetes que no usás y el agente arranca igual.
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -100,11 +101,21 @@ def crear_modelo(
                 "Falta el paquete de Gemini: pip install langchain-google-genai"
             ) from None
 
+        # Los Gemini nuevos "piensan" antes de contestar, y eso es lo que más
+        # tarda. Para un vendedor por WhatsApp alcanza con pensar poco:
+        # RAZONAMIENTO_GEMINI = minimal | low | medium | high (vacío = lo que
+        # decida el modelo). Por defecto "low": rápido y sigue bien las reglas.
+        extra = {}
+        razonamiento = (os.getenv("RAZONAMIENTO_GEMINI", "low") or "").strip().lower()
+        if razonamiento in ("minimal", "low", "medium", "high"):
+            extra["reasoning_effort"] = razonamiento
+
         return ChatGoogleGenerativeAI(
             model=modelo,
             google_api_key=api_key,
             max_output_tokens=max_tokens,
             timeout=120,
+            **extra,
         )
 
     if proveedor == "openrouter":

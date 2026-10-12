@@ -531,6 +531,11 @@ def crear_app(
             "sí" if getattr(lector, "transcribir", None) else "no (falta OPENAI_API_KEY o GOOGLE_API_KEY: pasan a una persona)",
             "calla al agente" if config.respetar_resueltas else "no cambia nada",
         )
+        # La lista de precios se pide ya, para que el primer cliente no espere
+        # a que Apps Script se despierte.
+        from ..precios import precalentar
+
+        precalentar()
         cuidar_el_permiso = (
             asyncio.create_task(mantener_el_permiso(avisos))
             if avisos.activos and avisos.metodo == "google"

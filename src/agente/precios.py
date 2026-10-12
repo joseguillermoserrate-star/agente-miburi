@@ -32,7 +32,9 @@ descuentos, así nunca queda desactualizado respecto del precio de lista.
 from __future__ import annotations
 
 import json
+import logging
 import os
+import threading
 import time
 import unicodedata
 import urllib.parse
@@ -46,6 +48,8 @@ ESPERA = 20  # segundos: Apps Script a veces tarda en despertar
 # lista larga de precios abruma, y el modelo tiende a repetir todo lo que ve.
 OPCIONES_POR_DEFECTO = 3
 OPCIONES_MAXIMAS = 5
+
+registro = logging.getLogger(__name__)
 
 _cache: dict = {"momento": 0.0, "filas": None}
 
@@ -183,11 +187,48 @@ def consultar_lotes(
 
 
 def _traer_filas() -> list[dict]:
-    """La lista completa, desde el caché si es reciente."""
-    vigencia = float(os.getenv("PRECIOS_CACHE_SEGUNDOS", "60") or 60)
-    if _cache["filas"] is not None and time.time() - _cache["momento"] < vigencia:
-        return _cache["filas"]
+    """La lista completa, sin hacer esperar a la persona.
 
+    La hoja se pide en segundo plano: si la copia guardada tiene más de
+    PRECIOS_CACHE_SEGUNDOS, se contesta con ella igual y se pide una nueva por
+    detrás. Apps Script tarda varios segundos en "despertar", y así esa espera
+    nunca cae en la respuesta. Solo la primera vez (sin copia) se espera.
+    """
+    vigencia = float(os.getenv("PRECIOS_CACHE_SEGUNDOS", "60") or 60)
+    edad = time.time() - _cache["momento"]
+    if _cache["filas"] is not None:
+        if edad >= vigencia:
+            _refrescar_en_segundo_plano()
+        return _cache["filas"]
+    return _bajar_la_hoja()
+
+
+_refrescando = threading.Lock()
+
+
+def _refrescar_en_segundo_plano() -> None:
+    if not _refrescando.acquire(blocking=False):
+        return  # ya hay uno en camino
+
+    def tarea():
+        try:
+            _bajar_la_hoja()
+        except Exception as e:  # noqa: BLE001
+            # Se sigue con la copia anterior; el próximo pedido lo vuelve a intentar.
+            registro.warning("No se pudo actualizar la lista de precios: %s", e)
+        finally:
+            _refrescando.release()
+
+    threading.Thread(target=tarea, daemon=True).start()
+
+
+def precalentar() -> None:
+    """Pide la hoja apenas arranca el servidor, para que el primer cliente no espere."""
+    if (os.getenv("PRECIOS_URL") or "").strip():
+        _refrescar_en_segundo_plano()
+
+
+def _bajar_la_hoja() -> list[dict]:
     url = (os.getenv("PRECIOS_URL") or "").strip()
     token = (os.getenv("PRECIOS_TOKEN") or "").strip()
     if not url or not token:
