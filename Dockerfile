@@ -43,7 +43,7 @@ RUN pip install --no-cache-dir -r requirements-produccion.txt
 
 COPY src/ ./src/
 COPY prompts/ ./prompts/
-COPY webhook_chatwoot.py bot_telegram.py probar_mail.py ./
+COPY webhook_chatwoot.py bot_telegram.py probar_mail.py diagnosticar_audio.py ./
 
 # Sin esto corre como root sin necesidad. Y el usuario es dueño solo de
 # datos/ (el SQLite, si alguien lo corre en modo test): el código y el
