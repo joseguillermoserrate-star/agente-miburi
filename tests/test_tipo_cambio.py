@@ -50,7 +50,7 @@ def test_convierte_con_el_valor_del_bcb(monkeypatch):
     assert "DÓLARES" in texto
 
 
-def test_si_el_bcb_falla_usa_el_respaldo(monkeypatch):
+def test_si_el_bcb_falla_no_usa_valores_fijos(monkeypatch):
     _limpiar(monkeypatch)
 
     def falla():
@@ -59,8 +59,8 @@ def test_si_el_bcb_falla_usa_el_respaldo(monkeypatch):
     monkeypatch.setattr(tc, "leer_bcb", falla)
     monkeypatch.setenv("TIPO_DE_CAMBIO_BOB", "11.73")
     texto = tc.convertir_a_bolivianos.invoke({"montos_usd": [1000]})
-    assert "Bs 11.730" in texto
-    assert "referencia configurado" in texto
+    assert "Bs 11.730" not in texto
+    assert "tipo de cambio flexible del Banco Central" in texto
 
 
 def test_sin_bcb_ni_respaldo_no_convierte(monkeypatch):
@@ -68,3 +68,4 @@ def test_sin_bcb_ni_respaldo_no_convierte(monkeypatch):
     monkeypatch.setattr(tc, "leer_bcb", lambda: None)
     texto = tc.convertir_a_bolivianos.invoke({"montos_usd": [1000]})
     assert "No conviertas" in texto
+    assert "flexible" in texto

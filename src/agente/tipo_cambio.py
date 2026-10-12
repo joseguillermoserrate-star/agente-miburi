@@ -11,14 +11,14 @@ De dónde sale el tipo de cambio, en este orden:
 2. La página del Banco Central de Bolivia
    (https://www.bcb.gob.bo/?q=cotizaciones_tc, fila «ESTADOS UNIDOS · DÓLAR ·
    USD»), si la hoja no tiene el dato.
-3. TIPO_DE_CAMBIO_BOB, como último respaldo.
 
-Variables de entorno (opcionales):
+Si no hay ninguno de los dos, NO se usa ningún valor fijo (para no dar un monto
+desactualizado): el agente dice que por el momento no tiene el tipo de cambio
+actual y que siempre se calcula al tipo de cambio flexible del Banco Central.
+
+Variable de entorno (opcional):
 
     TIPO_DE_CAMBIO_URL   de dónde leer la tabla (por defecto, la del BCB)
-    TIPO_DE_CAMBIO_BOB   valor de respaldo (ej. 11.73) por si la página del
-                         BCB no responde. Si no está y el BCB no responde, el
-                         agente no convierte y dice que el asesor lo confirma.
 
 Para probarlo en el servidor:  python probar_tipo_de_cambio.py
 """
@@ -62,9 +62,10 @@ def convertir_a_bolivianos(montos_usd: list[float]) -> str:
     tasa, origen = tipo_de_cambio()
     if not tasa:
         return (
-            "No se pudo leer el tipo de cambio del Banco Central en este momento. "
-            "No conviertas: decí que los precios son en dólares y que el ejecutivo "
-            "de ventas le confirma el monto en bolivianos."
+            "NO hay tipo de cambio disponible ahora. No conviertas ni estimes. "
+            "Decí, con tus palabras: que los precios son en dólares; que por el "
+            "momento no tenés el tipo de cambio actual, pero que siempre se calcula "
+            "al tipo de cambio flexible del Banco Central de Bolivia del día."
         )
     lineas = [f"Tipo de cambio oficial BCB ({origen}): Bs {_bs(tasa, 2)} por dólar."]
     for monto in montos_usd or []:
@@ -88,11 +89,11 @@ def tipo_de_cambio() -> tuple[float | None, str]:
     de_la_hoja = tipo_de_cambio_de_la_hoja()
     if de_la_hoja:
         return de_la_hoja, "vigente hoy " + _hoy_bolivia()
-    return _del_bcb_o_respaldo()
+    return _del_bcb()
 
 
-def _del_bcb_o_respaldo() -> tuple[float | None, str]:
-    """El valor del BCB (cacheado unas horas) o el respaldo del .env."""
+def _del_bcb() -> tuple[float | None, str]:
+    """El valor del BCB de hoy (cacheado unas horas), o nada."""
     ahora = time.time()
     with _candado:
         if _cache["valor"] and ahora - _cache["momento"] < VIGENCIA:
@@ -107,13 +108,7 @@ def _del_bcb_o_respaldo() -> tuple[float | None, str]:
         with _candado:
             _cache.update(momento=ahora, valor=valor, fecha=fecha)
         return valor, fecha
-    # El BCB no respondió: lo último que se leyó, o el respaldo del .env.
-    with _candado:
-        if _cache["valor"]:
-            return _cache["valor"], _cache["fecha"]
-    respaldo = _numero(os.getenv("TIPO_DE_CAMBIO_BOB") or "")
-    if respaldo and 1 < respaldo < 100:
-        return respaldo, "valor de referencia configurado"
+    # El BCB no respondió: no se usa un valor viejo ni uno fijo.
     return None, ""
 
 
