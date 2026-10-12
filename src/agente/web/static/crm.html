@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>CRM Villa Real</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f4f4f2;
+  --surface-1: #fcfcfb;
+  --surface-2: #f0efec;
+  --border: #e2e1dc;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --grid: #e8e7e3;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --ord-1: #86b6ef;
+  --ord-2: #3987e5;
+  --ord-3: #1c5cab;
+  --good: #0ca30c;
+  --warning: #fab219;
+  --critical: #d03b3b;
+  --accent: #1c5cab;
+  --accent-ink: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #121211;
+    --surface-1: #1a1a19;
+    --surface-2: #232321;
+    --border: #2f2f2c;
+    --text-primary: #f0efec;
+    --text-secondary: #c3c2b7;
+    --text-muted: #94938b;
+    --grid: #2b2b29;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --ord-1: #184f95;
+    --ord-2: #256abf;
+    --ord-3: #5598e7;
+    --accent: #6da7ec;
+    --accent-ink: #0b0b0b;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #121211; --surface-1: #1a1a19; --surface-2: #232321; --border: #2f2f2c;
+  --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #94938b; --grid: #2b2b29;
+  --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70;
+  --ord-1: #184f95; --ord-2: #256abf; --ord-3: #5598e7; --accent: #6da7ec; --accent-ink: #0b0b0b;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--page); color: var(--text-primary);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+header {
+  position: sticky; top: 0; z-index: 5; background: var(--surface-1);
+  border-bottom: 1px solid var(--border);
+}
+.barra { max-width: 1240px; margin: 0 auto; padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+h1 { font-size: 17px; margin: 0; font-weight: 650; letter-spacing: -.01em; }
+h1 small { font-weight: 400; color: var(--text-muted); font-size: 13px; margin-left: 6px; }
+.filtros { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-left: auto; }
+.filtros input[type=date] {
+  background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--border);
+  border-radius: 8px; padding: 5px 8px; font: inherit;
+}
+button, .boton {
+  background: var(--surface-2); color: var(--text-primary); border: 1px solid var(--border);
+  border-radius: 8px; padding: 5px 10px; font: inherit; cursor: pointer; text-decoration: none;
+}
+button.activo { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.estado-vivo { color: var(--text-muted); font-size: 12px; white-space: nowrap; }
+.estado-vivo::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--good); margin-right: 6px; vertical-align: 1px; }
+nav.pestanas { max-width: 1240px; margin: 0 auto; padding: 0 16px; display: flex; gap: 4px; overflow-x: auto; }
+nav.pestanas button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 9px 10px; color: var(--text-secondary); white-space: nowrap; }
+nav.pestanas button.activo { color: var(--text-primary); border-bottom-color: var(--accent); font-weight: 600; background: none; }
+main { max-width: 1240px; margin: 0 auto; padding: 16px; }
+section.vista { display: none; }
+section.vista.activa { display: block; }
+.grilla { display: grid; gap: 12px; }
+.g4 { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.g2 { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+.g3 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.tarjeta { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+.tarjeta h2 { font-size: 13px; font-weight: 600; margin: 0 0 2px; }
+.tarjeta .ayuda { color: var(--text-muted); font-size: 12px; margin: 0 0 10px; }
+.kpi .valor { font-size: 30px; font-weight: 650; letter-spacing: -.02em; line-height: 1.1; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.kpi .sub { color: var(--text-secondary); font-size: 12px; margin-top: 4px; }
+.kpi .titulo { color: var(--text-secondary); font-size: 12.5px; font-weight: 550; }
+.seccion-titulo { font-size: 15px; font-weight: 650; margin: 22px 0 10px; }
+.seccion-titulo:first-child { margin-top: 0; }
+.barras { display: grid; gap: 8px; }
+.barra-fila { display: grid; grid-template-columns: minmax(90px, 38%) 1fr auto; gap: 8px; align-items: center; font-size: 13px; }
+.barra-fila .nombre { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.barra-fila .pista { height: 14px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+.barra-fila .relleno { display: block; height: 100%; border-radius: 0 4px 4px 0; background: var(--series-1); min-width: 2px; }
+.barra-fila .num { font-variant-numeric: tabular-nums; color: var(--text-primary); min-width: 64px; text-align: right; }
+.vacio { color: var(--text-muted); font-size: 13px; padding: 8px 0; }
+.embudo .barra-fila .relleno.e0 { background: var(--ord-1); }
+.embudo .barra-fila .relleno.e1 { background: var(--ord-2); }
+.embudo .barra-fila .relleno.e2 { background: var(--ord-3); }
+.lienzo { position: relative; height: 260px; }
+.leyenda { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; }
+.leyenda i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { color: var(--text-secondary); font-weight: 600; font-size: 12px; position: sticky; top: 0; background: var(--surface-1); }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+.tabla-scroll { overflow: auto; max-height: 70vh; }
+.chip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--border); white-space: nowrap; }
+.chip::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; vertical-align: 1px; background: var(--text-muted); }
+.chip.bueno::before { background: var(--good); }
+.chip.malo::before { background: var(--critical); }
+.chip.pendiente::before { background: var(--warning); }
+.controles-tabla { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; align-items: center; }
+.controles-tabla input, .controles-tabla select {
+  background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 9px; font: inherit; min-width: 0;
+}
+.controles-tabla input { flex: 1 1 200px; }
+a { color: var(--accent); }
+.error { background: color-mix(in srgb, var(--critical) 12%, var(--surface-1)); border: 1px solid var(--critical); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; display: none; }
+.dos-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 22px; }
+@media (max-width: 640px) {
+  .dos-col { grid-template-columns: 1fr; }
+  .kpi .valor { font-size: 26px; }
+  .filtros { margin-left: 0; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="barra">
+    <h1>CRM Villa Real <small>Agente de WhatsApp</small></h1>
+    <div class="filtros">
+      <button data-rango="hoy">Hoy</button>
+      <button data-rango="7">7 días</button>
+      <button data-rango="30" class="activo">30 días</button>
+      <button data-rango="mes">Este mes</button>
+      <input type="date" id="desde" aria-label="Desde">
+      <input type="date" id="hasta" aria-label="Hasta">
+      <span class="estado-vivo" id="vivo">Conectando…</span>
+    </div>
+  </div>
+  <nav class="pestanas" role="tablist">
+    <button class="activo" data-vista="general">Visión general</button>
+    <button data-vista="calidad">Calidad comercial</button>
+    <button data-vista="productividad">Productividad</button>
+    <button data-vista="leads">Leads</button>
+  </nav>
+</header>
+
+<main>
+  <div class="error" id="error"></div>
+
+  <!-- VISIÓN GENERAL -->
+  <section class="vista activa" id="vista-general">
+    <div class="grilla g4" id="kpis-general"></div>
+
+    <div class="grilla g2" style="margin-top:12px">
+      <div class="tarjeta embudo">
+        <h2>Embudo del agente</h2>
+        <p class="ayuda">De los leads que escribieron en el período, cuántos se calificaron y cuántos pidieron visita o se derivaron a ventas.</p>
+        <div class="barras" id="embudo"></div>
+      </div>
+      <div class="tarjeta">
+        <h2>Reporte por agente: IA o humano</h2>
+        <p class="ayuda">Quién atendió en el período. El tiempo de respuesta de un humano se mide desde la derivación, la visita o la asignación.</p>
+        <div class="tabla-scroll" id="tabla-agentes"></div>
+      </div>
+    </div>
+
+    <div class="tarjeta" style="margin-top:12px">
+      <h2>Leads, visitas y derivaciones por día</h2>
+      <div class="leyenda">
+        <span><i style="background:var(--series-1)"></i>Leads nuevos</span>
+        <span><i style="background:var(--series-2)"></i>Visitas agendadas</span>
+        <span><i style="background:var(--series-3)"></i>Derivados a ventas</span>
+      </div>
+      <div class="lienzo"><canvas id="graf-diario" aria-label="Leads, visitas y derivaciones por día"></canvas></div>
+    </div>
+  </section>
+
+  <!-- CALIDAD COMERCIAL -->
+  <section class="vista" id="vista-calidad">
+    <div class="grilla g4" id="kpis-calidad"></div>
+    <div class="grilla g2" style="margin-top:12px">
+      <div class="tarjeta">
+        <h2>Leads por proyecto</h2>
+        <p class="ayuda">Proyecto que consultó o visitará.</p>
+        <div class="barras" id="por-proyecto"></div>
+      </div>
+      <div class="tarjeta">
+        <h2>Origen de los leads</h2>
+        <p class="ayuda">Anuncio de Meta (clic a WhatsApp) o WhatsApp directo.</p>
+        <div class="barras" id="por-origen"></div>
+        <div id="campanas-bloque" style="margin-top:14px"></div>
+      </div>
+      <div class="tarjeta">
+        <h2>Calificados y «malos»</h2>
+        <p class="ayuda">Malos: descartados, fuera de presupuesto o sin respuesta por más de 24 h.</p>
+        <div class="barras" id="calidad-barras"></div>
+      </div>
+      <div class="tarjeta">
+        <h2>Derivaciones y visitas</h2>
+        <p class="ayuda">Por qué se derivó a ventas y a qué proyecto van las visitas.</p>
+        <div class="ayuda" style="margin-bottom:6px">Motivo de derivación</div>
+        <div class="barras" id="por-derivacion"></div>
+        <div class="ayuda" style="margin:14px 0 6px">Visitas por proyecto</div>
+        <div class="barras" id="visitas-proyecto"></div>
+      </div>
+      <div class="tarjeta">
+        <h2>Para qué compran</h2>
+        <p class="ayuda">Inversión (resguardo de valor) o vivienda (dejar de alquilar).</p>
+        <div class="barras" id="por-motivo"></div>
+      </div>
+      <div class="tarjeta">
+        <h2>Forma de pago</h2>
+        <p class="ayuda">Lo que eligió en la conversación.</p>
+        <div class="barras" id="por-forma"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRODUCTIVIDAD -->
+  <section class="vista" id="vista-productividad">
+    <div class="grilla g4" id="kpis-productividad"></div>
+    <div class="tarjeta" style="margin-top:12px">
+      <h2>Mensajes por día: cliente, IA y equipo</h2>
+      <div class="leyenda">
+        <span><i style="background:var(--series-1)"></i>Cliente</span>
+        <span><i style="background:var(--series-2)"></i>IA</span>
+        <span><i style="background:var(--series-3)"></i>Equipo (humano)</span>
+      </div>
+      <div class="lienzo"><canvas id="graf-mensajes" aria-label="Mensajes por día"></canvas></div>
+    </div>
+    <div class="tarjeta" style="margin-top:12px">
+      <h2>Desglose por agente</h2>
+      <p class="ayuda">Conversaciones, mensajes y tiempo de respuesta (mediana) de la IA y de cada persona del equipo.</p>
+      <div class="tabla-scroll" id="tabla-agentes-2"></div>
+    </div>
+  </section>
+
+  <!-- LEADS -->
+  <section class="vista" id="vista-leads">
+    <div class="tarjeta">
+      <div class="controles-tabla">
+        <input type="search" id="buscar" placeholder="Buscar nombre, teléfono, proyecto…">
+        <select id="filtro-estado" aria-label="Estado">
+          <option value="">Todos los estados</option>
+          <option>en conversación</option>
+          <option>calificado</option>
+          <option>visita agendada</option>
+          <option>derivado a ventas</option>
+          <option>malo</option>
+        </select>
+        <a class="boton" id="csv" href="/crm/leads.csv">Descargar CSV</a>
+      </div>
+      <div class="tabla-scroll" id="tabla-leads"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  var datos = null;
+  var graficos = {};
+  var $ = function (id) { return document.getElementById(id); };
+  var css = function (v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); };
+
+  function esc(t) {
+    return String(t == null ? "" : t).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function num(n) { return (n || 0).toLocaleString("es-BO"); }
+  function usd(n) { return n ? "USD " + Math.round(n).toLocaleString("es-BO") : ""; }
+  function pct(p) { return (p || 0).toLocaleString("es-BO", { maximumFractionDigits: 1 }) + "%"; }
+  function dur(s) {
+    if (s == null) return "—";
+    if (s < 60) return Math.round(s) + " s";
+    if (s < 3600) return (s / 60).toLocaleString("es-BO", { maximumFractionDigits: 1 }) + " min";
+    if (s < 86400) return (s / 3600).toLocaleString("es-BO", { maximumFractionDigits: 1 }) + " h";
+    return (s / 86400).toLocaleString("es-BO", { maximumFractionDigits: 1 }) + " días";
+  }
+  function iso(d) {
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+
+  // -- Rango de fechas --------------------------------------------------
+  function fijarRango(tipo) {
+    var hoy = new Date();
+    var desde = new Date(hoy);
+    if (tipo === "7") desde.setDate(hoy.getDate() - 6);
+    else if (tipo === "30") desde.setDate(hoy.getDate() - 29);
+    else if (tipo === "mes") desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    $("desde").value = iso(desde);
+    $("hasta").value = iso(hoy);
+    document.querySelectorAll("[data-rango]").forEach(function (b) { b.classList.toggle("activo", b.dataset.rango === tipo); });
+    try { localStorage.setItem("crm-rango", tipo); } catch (e) {}
+    cargar();
+  }
+  document.querySelectorAll("[data-rango]").forEach(function (b) {
+    b.addEventListener("click", function () { fijarRango(b.dataset.rango); });
+  });
+  ["desde", "hasta"].forEach(function (id) {
+    $(id).addEventListener("change", function () {
+      document.querySelectorAll("[data-rango]").forEach(function (b) { b.classList.remove("activo"); });
+      cargar();
+    });
+  });
+
+  // -- Pestañas -----------------------------------------------------------
+  document.querySelectorAll("[data-vista]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll("[data-vista]").forEach(function (x) { x.classList.toggle("activo", x === b); });
+      document.querySelectorAll(".vista").forEach(function (v) { v.classList.toggle("activa", v.id === "vista-" + b.dataset.vista); });
+      try { localStorage.setItem("crm-vista", b.dataset.vista); } catch (e) {}
+      Object.values(graficos).forEach(function (g) { g.resize(); });
+    });
+  });
+
+  // -- Datos --------------------------------------------------------------
+  function consulta() { return "?desde=" + $("desde").value + "&hasta=" + $("hasta").value; }
+  function cargar() {
+    $("csv").href = "/crm/leads.csv" + consulta();
+    fetch("/crm/datos" + consulta(), { credentials: "same-origin", cache: "no-store" })
+      .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || r.status); return j; }); })
+      .then(function (j) {
+        datos = j;
+        $("error").style.display = "none";
+        $("vivo").textContent = "En línea · " + j.generado;
+        pintar();
+      })
+      .catch(function (e) {
+        $("error").style.display = "block";
+        $("error").textContent = "No se pudieron cargar los datos: " + e.message;
+        $("vivo").textContent = "Sin conexión";
+      });
+  }
+
+  // -- Piezas ---------------------------------------------------------------
+  function kpi(titulo, valor, sub) {
+    return '<div class="tarjeta kpi"><div class="titulo">' + esc(titulo) + '</div><div class="valor">' + valor +
+      '</div><div class="sub">' + (sub || "&nbsp;") + "</div></div>";
+  }
+  function barras(id, lista, opciones) {
+    opciones = opciones || {};
+    var el = $(id);
+    if (!lista || !lista.length) { el.innerHTML = '<div class="vacio">Sin datos en el período.</div>'; return; }
+    var max = Math.max.apply(null, lista.map(function (x) { return x.valor; })) || 1;
+    var total = opciones.total || lista.reduce(function (a, x) { return a + x.valor; }, 0) || 1;
+    el.innerHTML = lista.map(function (x, i) {
+      var ancho = Math.max(1, Math.round(100 * x.valor / max));
+      var clase = opciones.ordinal ? " e" + i : "";
+      var color = x.color ? ' style="width:' + ancho + "%;background:" + x.color + '"' : ' style="width:' + ancho + '%"';
+      return '<div class="barra-fila" title="' + esc(x.nombre) + ": " + num(x.valor) + '"><span class="nombre">' + esc(x.nombre) +
+        '</span><span class="pista"><span class="relleno' + clase + '"' + color + '></span></span><span class="num">' +
+        num(x.valor) + (opciones.pct ? ' <span style="color:var(--text-muted)">· ' + pct(100 * x.valor / total) + "</span>" : "") + "</span></div>";
+    }).join("");
+  }
+  function tablaAgentes(id) {
+    var filas = datos.productividad.por_agente;
+    if (!filas.length) { $(id).innerHTML = '<div class="vacio">Sin mensajes en el período.</div>'; return; }
+    $(id).innerHTML = "<table><thead><tr><th>Agente</th><th>Tipo</th><th class=n>Conversaciones</th><th class=n>Mensajes</th><th class=n>T. respuesta (mediana)</th></tr></thead><tbody>" +
+      filas.map(function (f) {
+        return "<tr><td>" + esc(f.agente) + "</td><td>" + esc(f.tipo) + "</td><td class=n>" + num(f.conversaciones) +
+          "</td><td class=n>" + num(f.mensajes) + "</td><td class=n>" + dur(f.tiempo_respuesta.mediana) +
+          (f.tiempo_respuesta.casos ? ' <span style="color:var(--text-muted)">(' + f.tiempo_respuesta.casos + ")</span>" : "") + "</td></tr>";
+      }).join("") + "</tbody></table>";
+  }
+
+  function grafico(id, tipo, series, apilado) {
+    if (!window.Chart) return;
+    var grid = css("--grid"), texto = css("--text-secondary");
+    var etiquetas = datos.series.dias.map(function (d) { var p = d.split("-"); return p[2] + "/" + p[1]; });
+    var conjuntos = series.map(function (s) {
+      var color = css(s.color);
+      return {
+        label: s.nombre, data: datos.series[s.clave], borderColor: color, backgroundColor: color,
+        borderWidth: tipo === "line" ? 2 : 0, pointRadius: tipo === "line" ? 2.5 : 0, pointHoverRadius: 5,
+        cubicInterpolationMode: "monotone", borderRadius: 4, borderSkipped: "start", maxBarThickness: 28
+      };
+    });
+    if (graficos[id]) graficos[id].destroy();
+    graficos[id] = new Chart($(id), {
+      type: tipo,
+      data: { labels: etiquetas, datasets: conjuntos },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        interaction: { mode: "index", intersect: false },
+        plugins: { legend: { display: false }, tooltip: { padding: 10 } },
+        scales: {
+          x: { stacked: !!apilado, grid: { display: false }, ticks: { color: texto, maxRotation: 0, autoSkipPadding: 12 } },
+          y: { stacked: !!apilado, beginAtZero: true, grid: { color: grid }, border: { display: false }, ticks: { color: texto, precision: 0 } }
+        }
+      }
+    });
+  }
+
+  function pintar() {
+    var g = datos.general, c = datos.calidad, p = datos.productividad;
+
+    // Visión general
+    $("kpis-general").innerHTML =
+      kpi("Leads contactados", num(g.leads), num(g.en_conversacion) + " todavía en conversación") +
+      kpi("Calificados", num(g.calificados), pct(g.conversion_calificado) + " de los leads") +
+      kpi("Pidieron visita", num(g.visitas), pct(g.conversion_visita) + " de los leads · " + num(g.reagendadas_en_rango) + " reagendadas") +
+      kpi("Derivados a ventas", num(g.derivados), pct(g.conversion_derivacion) + " de los leads · a " + esc(datos.ejecutivo));
+    barras("embudo", datos.embudo.map(function (e) { return { nombre: e.etapa, valor: e.valor }; }), { ordinal: true, pct: true, total: datos.embudo[0].valor });
+    tablaAgentes("tabla-agentes");
+    grafico("graf-diario", "line", [
+      { nombre: "Leads nuevos", clave: "leads", color: "--series-1" },
+      { nombre: "Visitas agendadas", clave: "visitas", color: "--series-2" },
+      { nombre: "Derivados a ventas", clave: "derivaciones", color: "--series-3" }
+    ]);
+
+    // Calidad comercial
+    $("kpis-calidad").innerHTML =
+      kpi("Leads calificados", num(c.calificados), pct(g.conversion_calificado) + " de los leads") +
+      kpi("Leads «malos»", num(g.malos), c.malos.map(function (m) { return esc(m.nombre) + ": " + m.valor; }).join(" · ")) +
+      kpi("Desde anuncios de Meta", num((c.por_origen.find(function (o) { return o.nombre === "Anuncio Meta"; }) || {}).valor), "el resto, WhatsApp directo") +
+      kpi("Visitas agendadas", num(g.visitas_agendadas_en_rango), "en el período, para " + esc(datos.ejecutivo));
+    barras("por-proyecto", c.por_proyecto, { pct: true });
+    barras("por-origen", c.por_origen, { pct: true });
+    $("campanas-bloque").innerHTML = c.por_campana.length ? '<div class="ayuda" style="margin-bottom:6px">Campañas</div><div class="barras" id="por-campana"></div>' : "";
+    if (c.por_campana.length) barras("por-campana", c.por_campana);
+    var buenos = [{ nombre: "Calificados", valor: c.calificados, color: "var(--good)" }].concat(
+      c.malos.map(function (m) { return { nombre: "Malo · " + m.nombre, valor: m.valor, color: "var(--critical)" }; }));
+    barras("calidad-barras", buenos.filter(function (x) { return x.valor; }), { pct: true, total: g.leads });
+    barras("por-derivacion", c.derivaciones);
+    barras("visitas-proyecto", c.visitas_por_proyecto);
+    barras("por-motivo", c.por_motivo, { pct: true });
+    barras("por-forma", c.por_forma_pago, { pct: true });
+
+    // Productividad
+    var d = p.ejecutivo_desde_derivacion, v = p.ejecutivo_desde_visita, a = p.ejecutivo_desde_asignacion;
+    $("kpis-productividad").innerHTML =
+      kpi("Tiempo medio de conversación", dur(p.duracion_conversacion.promedio), "mediana " + dur(p.duracion_conversacion.mediana) + " · " + num(p.duracion_conversacion.casos) + " conversaciones") +
+      kpi("Respuesta de la IA", dur(p.respuesta_ia.mediana), "mediana · promedio " + dur(p.respuesta_ia.promedio)) +
+      kpi("Ejecutivo, desde la derivación", dur(d.mediana), "mediana · " + num(d.casos) + " respondidas · " + num(d.sin_respuesta) + " sin respuesta") +
+      kpi("Ejecutivo, desde la visita agendada", dur(v.mediana), "mediana · " + num(v.casos) + " confirmadas · " + num(v.sin_respuesta) + " sin contacto") +
+      kpi("Desde la asignación", dur(a.mediana), "mediana · " + num(a.casos) + " respondidas · " + num(a.sin_respuesta) + " sin respuesta");
+    grafico("graf-mensajes", "bar", [
+      { nombre: "Cliente", clave: "mensajes_cliente", color: "--series-1" },
+      { nombre: "IA", clave: "mensajes_ia", color: "--series-2" },
+      { nombre: "Equipo", clave: "mensajes_humano", color: "--series-3" }
+    ], true);
+    tablaAgentes("tabla-agentes-2");
+
+    tablaLeads();
+  }
+
+  function tablaLeads() {
+    var texto = $("buscar").value.toLowerCase().trim();
+    var estado = $("filtro-estado").value;
+    var filas = datos.leads.filter(function (f) {
+      if (estado && f.estado !== estado) return false;
+      if (!texto) return true;
+      return [f.nombre, f.telefono, f.proyecto, f.origen, f.campana, f.detalle, f.asignado_a].join(" ").toLowerCase().indexOf(texto) >= 0;
+    });
+    if (!filas.length) { $("tabla-leads").innerHTML = '<div class="vacio">No hay leads con ese filtro.</div>'; return; }
+    var clase = function (f) { return f.calidad === "Bueno" ? "bueno" : f.calidad === "Pendiente" ? "pendiente" : "malo"; };
+    $("tabla-leads").innerHTML = "<table><thead><tr><th>Lead</th><th>Estado</th><th>Proyecto</th><th>Pago</th><th class=n>Monto</th><th>Para</th><th>Origen</th><th>Visita</th><th>Último mensaje</th><th class=n>Msjs (cli/IA/eq)</th></tr></thead><tbody>" +
+      filas.map(function (f) {
+        var nombre = esc(f.nombre || "Sin nombre");
+        var enlace = datos.chatwoot ? '<a href="' + esc(datos.chatwoot + f.conversacion) + '" target="_blank" rel="noopener">' + nombre + "</a>" : nombre;
+        var monto = f.forma_pago === "plazo" && f.cuota_usd ? usd(f.cuota_usd) + "/mes" : usd(f.presupuesto_usd || f.cuota_usd);
+        return "<tr><td>" + enlace + '<div style="color:var(--text-muted);font-size:12px">' + esc(f.telefono) + "</div></td>" +
+          '<td><span class="chip ' + clase(f) + '">' + esc(f.estado === "malo" ? "malo · " + f.calidad.toLowerCase() : f.estado) + "</span>" +
+          (f.detalle ? '<div style="color:var(--text-muted);font-size:12px">' + esc(f.detalle) + "</div>" : "") + "</td>" +
+          "<td>" + esc(f.proyecto) + "</td><td>" + esc(f.forma_pago) + "</td><td class=n>" + esc(monto) + "</td><td>" + esc(f.motivo_compra === "inversion" ? "inversión" : f.motivo_compra) + "</td>" +
+          "<td>" + esc(f.origen) + (f.campana ? '<div style="color:var(--text-muted);font-size:12px">' + esc(f.campana) + "</div>" : "") + "</td>" +
+          "<td>" + esc(f.visita) + "</td><td>" + esc(f.ultimo_mensaje) + "</td><td class=n>" + f.mensajes_cliente + " / " + f.mensajes_ia + " / " + f.mensajes_humano + "</td></tr>";
+      }).join("") + "</tbody></table>";
+  }
+  $("buscar").addEventListener("input", function () { if (datos) tablaLeads(); });
+  $("filtro-estado").addEventListener("change", function () { if (datos) tablaLeads(); });
+
+  // Repinta los gráficos si cambia el modo claro/oscuro.
+  if (window.matchMedia) {
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () { if (datos) pintar(); });
+  }
+
+  // Arranque: lo último elegido, y se actualiza solo cada minuto.
+  var rango = "30", vista = "general";
+  try { rango = localStorage.getItem("crm-rango") || "30"; vista = localStorage.getItem("crm-vista") || "general"; } catch (e) {}
+  var boton = document.querySelector('[data-vista="' + vista + '"]');
+  if (boton) boton.click();
+  fijarRango(rango);
+  setInterval(function () { if (!document.hidden) cargar(); }, 60000);
+})();
+</script>
+</body>
+</html>

@@ -47,6 +47,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from .. import crm
 from ..agente import Agente
 from ..avisos import Avisos
 from ..canales.adjuntos import DescriptorDeFotos, Lector, TranscriptorGemini, TranscriptorOpenAI
@@ -55,9 +56,11 @@ from ..canales.buffer import BufferDeMensajes
 from ..canales.chatwoot import Chatwoot, tarda_en_escribir
 from ..canales.whatsapp_meta import marcar_visto_y_escribiendo, wamid_del_evento
 from ..config import Config, ErrorDeConfiguracion
+from ..crm.herramientas import aplicar_derivacion_pendiente
 from ..frenos import BLOQUEAR, IGNORAR, TopeDeMensajes
 from ..modelos import crear_modelo
 from ..respuesta import partir_respuesta
+from .panel_crm import montar_crm
 
 registro = logging.getLogger("agente.webhook")
 
@@ -391,6 +394,9 @@ def crear_app(
                         registro.error("[%s] no se pudo pasar a una persona: %s", conversacion, e)
             finally:
                 await asyncio.to_thread(canal.escribiendo, conversacion, False)
+                # Si la IA derivó al ejecutivo, recién ahora (con la respuesta
+                # ya mandada) se etiqueta, se deja la nota y se asigna.
+                await asyncio.to_thread(aplicar_derivacion_pendiente, conversacion, canal)
 
     async def algo_se_rompio(conversacion: str, error: Exception, causa: str, tipo: str) -> None:
         """El modelo o Chatwoot fallaron: el equipo se entera, el cliente no.
@@ -635,6 +641,7 @@ def crear_app(
             return JSONResponse({"error": f"{type(e).__name__}: {e}"}, status_code=500)
         tope.olvidar(conversacion)
         revisadas.discard(conversacion)
+        await asyncio.to_thread(crm.borrar, conversacion)
         registro.info("[%s] memoria borrada: arranca de cero", conversacion)
         return JSONResponse({"estado": "ok", "conversacion": conversacion})
 
@@ -658,6 +665,14 @@ def crear_app(
             return JSONResponse({"error": "esperaba JSON"}, status_code=400)
         if not isinstance(evento, dict):
             return JSONResponse({"error": "esperaba un objeto JSON"}, status_code=400)
+
+        # El CRM anota todo lo que pasa (mensajes del cliente, de la IA y del
+        # equipo; asignaciones), en segundo plano: no demora la respuesta.
+        if evento.get("event") == "message_created":
+            en_segundo_plano(asyncio.to_thread(crm.anotar_mensaje, evento))
+        elif evento.get("event") == "conversation_updated":
+            en_segundo_plano(asyncio.to_thread(crm.anotar_asignacion, evento))
+            return JSONResponse({"estado": "anotado"})
 
         # Resolvieron una conversación: si se eligió así al instalar, queda
         # con la etiqueta y el agente no le vuelve a hablar a esa persona.
@@ -706,6 +721,7 @@ def crear_app(
 
         return JSONResponse({"estado": "recibido"})
 
+    montar_crm(app, getattr(canal, "url", ""), str(getattr(canal, "cuenta_id", "1")))
     return app
 
 

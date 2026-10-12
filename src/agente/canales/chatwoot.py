@@ -373,6 +373,10 @@ class Chatwoot(Canal):
                 time.sleep(pausa(texto))
             primero = False
 
+            # Para el CRM: este texto lo escribió la IA, no alguien del equipo.
+            from ..crm import lo_va_a_mandar_la_ia
+
+            lo_va_a_mandar_la_ia(conversacion, texto)
             self._api(
                 "POST",
                 f"conversations/{conversacion}/messages",
@@ -392,6 +396,13 @@ class Chatwoot(Canal):
         """
         if not self.etiqueta_humano:
             return
+
+        if motivo:
+            # Un traspaso del sistema (falla, tope, resuelta): el CRM lo cuenta
+            # aparte de las derivaciones de ventas.
+            from ..crm import anotar_traspaso
+
+            anotar_traspaso(conversacion, motivo)
 
         respuesta = self._api("GET", f"conversations/{conversacion}/labels")
         etiquetas = [str(e) for e in respuesta.get("payload") or []]

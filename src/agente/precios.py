@@ -40,6 +40,7 @@ import unicodedata
 import urllib.parse
 import urllib.request
 
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 
 ESPERA = 20  # segundos: Apps Script a veces tarda en despertar
@@ -63,6 +64,8 @@ def consultar_lotes(
     cantidad_de_opciones: int = OPCIONES_POR_DEFECTO,
     incluir_no_disponibles: bool = False,
     cliente_pide_mejor_precio: bool = False,
+    motivo_compra: str = "",
+    config: RunnableConfig = None,
 ) -> str:
     """Busca en la lista de precios ACTUALIZADA las opciones de lotes que mejor
     le encajan a la persona, según cómo quiere pagar y cuánto tiene.
@@ -92,6 +95,8 @@ def consultar_lotes(
             precio?", "¿hay más descuento?", "¿no hay algo más barato?",
             "está caro"). Nunca lo pongas en True por tu cuenta ni en la
             primera consulta. Con True aparece el descuento especial.
+        motivo_compra: Para qué busca el terreno, si ya lo sabés: "inversion"
+            o "vivienda". Vacío si no lo sabés. (Es para el reporte de ventas.)
     """
     try:
         filas = _traer_filas()
@@ -180,6 +185,15 @@ def consultar_lotes(
         )
 
     unicas = list(dict.fromkeys(_redactar(f, forma, cliente_pide_mejor_precio) for f in elegidas))
+    _anotar_en_el_crm(
+        config,
+        forma,
+        presupuesto_contado_maximo_usd,
+        cuota_mensual_maxima_usd,
+        proyecto,
+        motivo_compra,
+        sin_opciones=bool(encabezado and encabezado[0].startswith("NINGUNA")),
+    )
     lineas = encabezado + unicas[:cantidad]
     if len(unicas) > cantidad:
         resto = len(unicas) - cantidad
@@ -201,6 +215,22 @@ def consultar_lotes(
             "esfuerzo de la empresa y precio final. No hay descuento mayor."
         )
     return "\n".join(lineas)
+
+
+def _anotar_en_el_crm(config, forma, presupuesto, cuota, proyecto, motivo, sin_opciones) -> None:
+    """Lo que dijo el cliente (forma de pago, monto, proyecto) queda en su ficha del CRM."""
+    from .crm import anotar_consulta_de_precios
+
+    conversacion = str(((config or {}).get("configurable") or {}).get("thread_id") or "")
+    anotar_consulta_de_precios(
+        conversacion,
+        forma_de_pago=forma,
+        presupuesto_usd=presupuesto or 0,
+        cuota_usd=cuota or 0,
+        proyecto=proyecto,
+        motivo_compra=motivo,
+        sin_opciones=sin_opciones,
+    )
 
 
 def _traer_filas() -> list[dict]:

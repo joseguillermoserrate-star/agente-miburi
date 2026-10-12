@@ -124,6 +124,17 @@ def agendar_visita(
         )
 
     if datos.get("ok"):
+        from .crm import anotar_visita
+
+        anotar_visita(
+            conversacion,
+            fecha=str(datos.get("fecha") or fecha),
+            hora=str(datos.get("hora") or hora),
+            nombre=nombre,
+            telefono=telefono,
+            proyecto=proyecto,
+            forma_de_pago=forma_de_pago,
+        )
         ubicacion = datos.get("ubicacion") or ""
         return (
             f"VISITA AGENDADA: {datos.get('dia_semana', '')} {datos.get('fecha')} "
@@ -178,6 +189,14 @@ def reagendar_visita(nueva_fecha: str, nueva_hora: str, config: RunnableConfig =
         )
 
     if datos.get("ok"):
+        from .crm import anotar_visita
+
+        anotar_visita(
+            conversacion,
+            fecha=str(datos.get("fecha") or nueva_fecha),
+            hora=str(datos.get("hora") or nueva_hora),
+            reagendada=True,
+        )
         ubicacion = datos.get("ubicacion") or ""
         return (
             f"VISITA REAGENDADA: antes {datos.get('antes')}, ahora "
