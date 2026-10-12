@@ -551,8 +551,7 @@ class TranscriptorGemini:
     def __call__(self, datos: bytes, tipo: str, nombre: str) -> str:
         if len(datos) > TOPE_AUDIO_EN_LINEA:
             raise ValueError("El audio es demasiado largo para transcribirlo.")
-        # Chatwoot a veces manda "audio/ogg; codecs=opus": Gemini quiere el tipo pelado.
-        tipo = (tipo or "audio/ogg").split(";")[0].strip() or "audio/ogg"
+        tipo = _tipo_de_audio_para_gemini(datos, tipo, nombre)
         cuerpo = json.dumps(
             {
                 "contents": [
@@ -593,6 +592,44 @@ class TranscriptorGemini:
         candidatos = datos_de_vuelta.get("candidates") or []
         partes = ((candidatos[0].get("content") or {}).get("parts") or []) if candidatos else []
         return " ".join(str(p.get("text") or "") for p in partes).strip()
+
+
+# Gemini solo acepta estos tipos de audio. Chatwoot no siempre manda el tipo
+# bien: los audios de WhatsApp (ogg/opus) a veces llegan como "audio/opus",
+# "video/ogg" o "application/octet-stream", y con esos Gemini contesta 400.
+# Por eso el tipo se deduce primero de los bytes del archivo, que no mienten.
+_TIPOS_DE_AUDIO_DE_GEMINI = {
+    "audio/wav", "audio/mp3", "audio/aiff", "audio/aac", "audio/ogg", "audio/flac",
+}
+
+
+def _tipo_de_audio_para_gemini(datos: bytes, tipo: str, nombre: str) -> str:
+    cabeza = datos[:12]
+    if cabeza.startswith(b"OggS"):
+        return "audio/ogg"
+    if cabeza.startswith(b"RIFF") and cabeza[8:12] == b"WAVE":
+        return "audio/wav"
+    if cabeza.startswith(b"ID3") or cabeza[:2] in (b"\xff\xfb", b"\xff\xf3", b"\xff\xf2"):
+        return "audio/mp3"
+    if cabeza.startswith(b"fLaC"):
+        return "audio/flac"
+    if cabeza.startswith(b"FORM") and cabeza[8:12] in (b"AIFF", b"AIFC"):
+        return "audio/aiff"
+    if cabeza[4:8] == b"ftyp" or cabeza[:2] in (b"\xff\xf1", b"\xff\xf9"):
+        return "audio/aac"  # m4a / aac (los audios de iPhone)
+
+    # Si los bytes no dicen nada, el tipo declarado y, por último, la extensión.
+    pelado = (tipo or "").split(";")[0].strip().lower()
+    equivalentes = {"audio/mpeg": "audio/mp3", "audio/x-wav": "audio/wav", "audio/wave": "audio/wav",
+                    "audio/opus": "audio/ogg", "video/ogg": "audio/ogg", "audio/mp4": "audio/aac",
+                    "audio/x-m4a": "audio/aac", "audio/m4a": "audio/aac", "audio/x-flac": "audio/flac"}
+    pelado = equivalentes.get(pelado, pelado)
+    if pelado in _TIPOS_DE_AUDIO_DE_GEMINI:
+        return pelado
+    extension = (nombre or "").rsplit(".", 1)[-1].lower()
+    por_extension = {"ogg": "audio/ogg", "oga": "audio/ogg", "opus": "audio/ogg", "mp3": "audio/mp3",
+                     "wav": "audio/wav", "m4a": "audio/aac", "aac": "audio/aac", "flac": "audio/flac"}
+    return por_extension.get(extension, "audio/ogg")  # WhatsApp casi siempre manda ogg
 
 
 class _SinRedireccionesGoogle(urllib.request.HTTPRedirectHandler):
