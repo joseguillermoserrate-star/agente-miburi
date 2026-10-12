@@ -41,36 +41,46 @@ import urllib.request
 from langchain_core.tools import tool
 
 ESPERA = 20  # segundos: Apps Script a veces tarda en despertar
-MAXIMO_DE_RESULTADOS = 15
+
+# Cuántas opciones se le pasan al modelo. Pocas a propósito: en WhatsApp una
+# lista larga de precios abruma, y el modelo tiende a repetir todo lo que ve.
+OPCIONES_POR_DEFECTO = 3
+OPCIONES_MAXIMAS = 5
 
 _cache: dict = {"momento": 0.0, "filas": None}
 
 
 @tool
 def consultar_lotes(
-    proyecto: str = "",
+    forma_de_pago: str = "",
     presupuesto_contado_maximo_usd: float = 0,
     cuota_mensual_maxima_usd: float = 0,
+    proyecto: str = "",
+    cantidad_de_opciones: int = OPCIONES_POR_DEFECTO,
     incluir_no_disponibles: bool = False,
 ) -> str:
-    """Consulta la lista de precios ACTUALIZADA de los lotes y su disponibilidad.
+    """Busca en la lista de precios ACTUALIZADA las opciones de lotes que mejor
+    le encajan a la persona, según cómo quiere pagar y cuánto tiene.
 
-    Usala SIEMPRE que pregunten por precios, precio por metro cuadrado,
-    descuentos, pago al contado, financiamiento, cuota inicial, cuota mensual,
-    plazos, superficie o qué lotes hay. Nunca inventes un precio ni
-    un descuento: si no está en el resultado de esta herramienta, no lo sabés.
+    Usala SIEMPRE que hables de precios, descuentos, cuotas, plazos o
+    disponibilidad. Nunca inventes un precio ni un descuento: si no está en el
+    resultado de esta herramienta, no lo sabés.
 
-    Todos los filtros son opcionales; dejalos vacíos o en 0 para no filtrar.
+    Devuelve solo unas pocas opciones (las que mejor aprovechan el presupuesto),
+    no la lista completa. Pasale todo lo que la persona ya te dijo.
 
     Args:
-        proyecto: Nombre (o parte) del proyecto, por ejemplo "Villa Real V".
-        presupuesto_contado_maximo_usd: Lo máximo que la persona puede pagar
-            al contado, en dólares. Se compara con el precio al contado con el
-            descuento inicial. 0 = sin tope.
-        cuota_mensual_maxima_usd: La cuota mensual máxima que puede pagar, en
-            dólares. 0 = sin tope.
+        forma_de_pago: "contado" o "plazo". Si la persona todavía no lo dijo,
+            dejalo vacío (pero antes preguntáselo).
+        presupuesto_contado_maximo_usd: Para contado: lo máximo que puede pagar,
+            en dólares. 0 = no lo dijo.
+        cuota_mensual_maxima_usd: Para plazo: la cuota mensual máxima que puede
+            pagar, en dólares. 0 = no lo dijo.
+        proyecto: Solo si pregunta por un proyecto puntual, por ejemplo
+            "Villa Real V". Vacío = todos los proyectos.
+        cantidad_de_opciones: Cuántas opciones devolver (1 a 5). Por defecto 3.
         incluir_no_disponibles: True solo si preguntan específicamente por
-            lotes reservados o vendidos. Por defecto, solo los disponibles.
+            lotes reservados o vendidos.
     """
     try:
         filas = _traer_filas()
@@ -83,41 +93,91 @@ def consultar_lotes(
             "le confirma la información."
         )
 
-    encontradas = []
-    for fila in filas:
-        if not incluir_no_disponibles and _normal(fila.get("estado")) != "disponible":
-            continue
-        if proyecto and not _coincide(proyecto, fila.get("proyecto")):
-            continue
-        if presupuesto_contado_maximo_usd:
-            contado, _ = _precios_contado(fila)
-            if contado > presupuesto_contado_maximo_usd:
-                continue
-        if cuota_mensual_maxima_usd and _numero(fila.get("cuota_mensual_usd")) > cuota_mensual_maxima_usd:
-            continue
-        encontradas.append(fila)
+    forma = _normal(forma_de_pago)
+    if "plaz" in forma or "cuota" in forma or "credito" in forma or "financ" in forma:
+        forma = "plazo"
+    elif "contado" in forma or "cash" in forma or "efectivo" in forma:
+        forma = "contado"
+    else:
+        forma = ""
+    # Si dio un monto, la forma de pago se deduce del monto.
+    if not forma and presupuesto_contado_maximo_usd and not cuota_mensual_maxima_usd:
+        forma = "contado"
+    if not forma and cuota_mensual_maxima_usd and not presupuesto_contado_maximo_usd:
+        forma = "plazo"
 
-    if not encontradas:
+    cantidad = max(1, min(int(cantidad_de_opciones or OPCIONES_POR_DEFECTO), OPCIONES_MAXIMAS))
+
+    candidatas = [
+        f for f in filas
+        if (incluir_no_disponibles or _normal(f.get("estado")) == "disponible")
+        and (not proyecto or _coincide(proyecto, f.get("proyecto")))
+    ]
+    if not candidatas:
         proyectos = sorted({str(f.get("proyecto", "")).strip() for f in filas if f.get("proyecto")})
         return (
-            "No hay lotes que cumplan esos filtros. "
+            "No hay lotes disponibles con ese criterio. "
             f"Proyectos que existen en la lista: {', '.join(proyectos) or 'ninguno'}."
         )
 
-    encontradas.sort(key=lambda f: (str(f.get("proyecto", "")), _numero(f.get("precio_lista_usd"))))
-    unicas = list(dict.fromkeys(_redactar(f) for f in encontradas))
-    lineas = [
-        f"Opciones encontradas: {len(unicas)}.",
-        "REGLA DE DESCUENTO: ofrecé siempre el precio con el descuento inicial. "
-        "El descuento máximo es solo para cuando la persona pide un mejor precio "
-        "para pagar al contado; nunca lo ofrezcas de entrada. Los descuentos son "
-        "solo para pago al contado, no para el plan a plazos.",
-    ]
-    lineas.extend(unicas[:MAXIMO_DE_RESULTADOS])
-    if len(unicas) > MAXIMO_DE_RESULTADOS:
+    def contado(f):
+        return _precios_contado(f)[0]
+
+    def cuota(f):
+        return _numero(f.get("cuota_mensual_usd"))
+
+    encabezado = []
+    if presupuesto_contado_maximo_usd:
+        tope = presupuesto_contado_maximo_usd
+        entran = [f for f in candidatas if contado(f) <= tope]
+        # Lo que mejor aprovecha el presupuesto primero: el más cercano por debajo.
+        entran.sort(key=contado, reverse=True)
+        if entran:
+            elegidas = entran
+            encabezado.append(f"Opciones al contado que entran en USD {_formato(tope)}:")
+        else:
+            elegidas = sorted(candidatas, key=contado)
+            encabezado.append(
+                f"NINGUNA opción entra en USD {_formato(tope)} al contado. Estas son "
+                "las más cercanas: decíselo con tacto y, si le sirve, ofrecé el plan a plazo."
+            )
+    elif cuota_mensual_maxima_usd:
+        tope = cuota_mensual_maxima_usd
+        entran = [f for f in candidatas if cuota(f) <= tope]
+        entran.sort(key=cuota, reverse=True)
+        if entran:
+            elegidas = entran
+            encabezado.append(f"Opciones a plazo con cuota de hasta USD {_formato(tope)} por mes:")
+        else:
+            elegidas = sorted(candidatas, key=cuota)
+            encabezado.append(
+                f"NINGUNA opción tiene cuota de hasta USD {_formato(tope)}. Estas son "
+                "las más cercanas: decíselo con tacto."
+            )
+    else:
+        # Sin monto: de cada proyecto, desde la opción más accesible.
+        elegidas = sorted(
+            candidatas, key=lambda f: (cuota(f) if forma == "plazo" else contado(f))
+        )
+        encabezado.append(
+            "Opciones más accesibles. La persona todavía no dijo su presupuesto: "
+            "mostrá como mucho 2 y preguntale cuánto tiene"
+            + (" por mes." if forma == "plazo" else " para invertir.")
+        )
+
+    unicas = list(dict.fromkeys(_redactar(f, forma) for f in elegidas))
+    lineas = encabezado + unicas[:cantidad]
+    if len(unicas) > cantidad:
+        resto = len(unicas) - cantidad
         lineas.append(
-            "(Hay más opciones. Pedile a la persona que acote por proyecto "
-            "o presupuesto.)"
+            f"(Hay {resto} {'opción' if resto == 1 else 'opciones'} más; "
+            "no las menciones salvo que las pida.)"
+        )
+    if forma != "plazo":
+        lineas.append(
+            "REGLA DE DESCUENTO: ofrecé el precio con el descuento inicial. El "
+            "descuento máximo es solo si la persona pide un mejor precio al contado; "
+            "nunca lo ofrezcas de entrada."
         )
     return "\n".join(lineas)
 
@@ -156,8 +216,12 @@ def _precios_contado(f: dict) -> tuple[float, float]:
     return lista * (1 - inicial), lista * (1 - maximo)
 
 
-def _redactar(f: dict) -> str:
-    """Una línea por opción, en texto: menos chances de que el modelo se confunda."""
+def _redactar(f: dict, forma: str = "") -> str:
+    """Una línea por opción, en texto: menos chances de que el modelo se confunda.
+
+    Solo con los datos de la forma de pago que eligió la persona: si quiere a
+    plazo, el modelo no ve los precios de contado (y no los mezcla), y al revés.
+    """
     lista = _numero(f.get("precio_lista_usd"))
     inicial = _porcentaje(f.get("descuento_contado_inicial"))
     maximo = _porcentaje(f.get("descuento_contado_maximo")) or inicial
@@ -167,25 +231,25 @@ def _redactar(f: dict) -> str:
     if f.get("ubicacion"):
         partes.append(str(f.get("ubicacion")))
     partes.append(f"{_formato(f.get('superficie_m2'))} m²")
-    if f.get("precio_m2_lista_usd"):
-        partes.append(f"USD {_formato(f.get('precio_m2_lista_usd'), 2)}/m² de lista")
-    partes.append(f"precio de lista USD {_formato(lista)}")
-    if inicial:
+    if forma != "plazo":
+        partes.append(f"precio de lista USD {_formato(lista)}")
+        if inicial:
+            partes.append(
+                f"AL CONTADO con {_pct(inicial)} de descuento: USD {_formato(contado_inicial)}"
+            )
+        if maximo > inicial:
+            partes.append(
+                f"(descuento máximo autorizado {_pct(maximo)}: USD {_formato(contado_maximo)}, "
+                "solo si pide mejor precio)"
+            )
+    if forma != "contado" and f.get("plazo_anios"):
         partes.append(
-            f"AL CONTADO con {_pct(inicial)} de descuento: USD {_formato(contado_inicial)}"
-        )
-    if maximo > inicial:
-        partes.append(
-            f"(descuento máximo autorizado {_pct(maximo)}: USD {_formato(contado_maximo)}, "
-            "solo si pide mejor precio)"
-        )
-    if f.get("plazo_anios"):
-        partes.append(
-            f"A PLAZO {_formato(f.get('plazo_anios'))} años: cuota inicial USD "
+            f"A PLAZO hasta {_formato(f.get('plazo_anios'))} años: cuota inicial USD "
             f"{_formato(f.get('cuota_inicial_usd'))} y cuota mensual USD "
-            f"{_formato(f.get('cuota_mensual_usd'), 2)}"
+            f"{_formato(f.get('cuota_mensual_usd'), 2)} (sin descuento)"
         )
-    partes.append(f"estado: {f.get('estado', '?')}")
+    if _normal(f.get("estado")) != "disponible":
+        partes.append(f"estado: {f.get('estado', '?')}")
     if f.get("observaciones"):
         partes.append(f"({f.get('observaciones')})")
     return " · ".join(partes)
