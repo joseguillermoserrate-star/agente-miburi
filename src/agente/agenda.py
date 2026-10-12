@@ -145,7 +145,53 @@ def agendar_visita(
     return texto
 
 
-HERRAMIENTAS_DE_AGENDA = [consultar_disponibilidad, agendar_visita]
+@tool
+def reagendar_visita(nueva_fecha: str, nueva_hora: str, config: RunnableConfig = None) -> str:
+    """Cambia a otro horario la visita que esta persona ya tiene agendada.
+
+    Usala cuando la persona quiera mover su visita. Antes consultá
+    `consultar_disponibilidad` para ofrecerle horarios libres. La visita se
+    encuentra sola (por esta conversación o por su teléfono): no pidas datos.
+
+    Args:
+        nueva_fecha: Nuevo día, AAAA-MM-DD.
+        nueva_hora: Nueva hora de inicio, HH:MM en 24 horas.
+    """
+    conversacion = str(((config or {}).get("configurable") or {}).get("thread_id") or "")
+    try:
+        datos = _pedir(
+            {
+                "accion": "reagendar",
+                "conversacion": conversacion,
+                "telefono": _telefono_de(conversacion),
+                "fecha": nueva_fecha,
+                "hora": nueva_hora,
+            },
+            exigir_ok=False,
+        )
+    except Exception as e:  # noqa: BLE001
+        return (
+            f"No se pudo reagendar ({type(e).__name__}). No digas que se cambió: "
+            "decí que un asesor le confirma el nuevo horario."
+        )
+
+    if datos.get("ok"):
+        ubicacion = datos.get("ubicacion") or ""
+        return (
+            f"VISITA REAGENDADA: antes {datos.get('antes')}, ahora "
+            f"{datos.get('dia_semana', '')} {datos.get('fecha')} de {datos.get('hora')} "
+            f"a {datos.get('hora_fin')}. Confirmáselo con el nuevo día y hora"
+            + (f" y recordale el punto de encuentro: {ubicacion}" if ubicacion else "")
+            + "."
+        )
+    sugerencias = datos.get("sugerencias") or []
+    texto = f"NO se reagendó: {datos.get('error') or 'no se pudo'}."
+    if sugerencias:
+        texto += " Horarios libres cercanos: " + "; ".join(sugerencias) + ". Ofrecé 2 o 3."
+    return texto
+
+
+HERRAMIENTAS_DE_AGENDA = [consultar_disponibilidad, agendar_visita, reagendar_visita]
 
 
 # -- Por dentro -------------------------------------------------------------

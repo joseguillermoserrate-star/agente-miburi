@@ -8,8 +8,8 @@
  * Reglas:
  *  - Cada visita dura 1 hora (ir y volver).
  *  - Hasta 2 visitas en la misma hora; la tercera tiene que ir a otra hora.
- *  - Si en tu calendario tenés OTRO evento (que no sea una visita) en ese
- *    horario, la hora está ocupada. Los eventos de todo el día no bloquean.
+ *  - Solo cuentan las visitas: tus otros eventos del calendario NO bloquean.
+ *  - Un cliente puede reagendar su visita a otro horario libre.
  *  - Solo dentro del horario de visitas (abajo) y con anticipación mínima.
  *
  * Después de pegarlo: Implementar → Nueva implementación → Aplicación web
@@ -45,6 +45,7 @@ function doPost(e) {
   try {
     if (datos.accion === 'disponibilidad') return responder(disponibilidad(datos));
     if (datos.accion === 'agendar') return responder(agendar(datos));
+    if (datos.accion === 'reagendar') return responder(reagendar(datos));
     return responder({ ok: false, error: 'acción desconocida' });
   } catch (err) {
     return responder({ ok: false, error: String(err) });
@@ -99,18 +100,20 @@ function horariosLibres(fecha) {
   return libres;
 }
 
-/** Cuántas visitas más entran en [inicio, fin): 0 si está ocupado. */
-function lugaresLibres(eventos, inicio, fin) {
+/**
+ * Cuántas visitas más entran en [inicio, fin). Solo cuentan las visitas: los
+ * demás eventos de tu calendario no bloquean. `excluirId` deja afuera una
+ * visita (la que se está moviendo al reagendar).
+ */
+function lugaresLibres(eventos, inicio, fin, excluirId) {
   var visitas = 0;
   for (var i = 0; i < eventos.length; i++) {
     var ev = eventos[i];
     if (ev.isAllDayEvent()) continue;
+    if (ev.getTitle().indexOf(PREFIJO) !== 0) continue; // no es una visita
+    if (excluirId && ev.getId() === excluirId) continue;
     if (ev.getStartTime() >= fin || ev.getEndTime() <= inicio) continue; // no se pisan
-    if (ev.getTitle().indexOf(PREFIJO) === 0) {
-      visitas++;
-    } else {
-      return 0; // otro compromiso tuyo en ese horario
-    }
+    visitas++;
   }
   return Math.max(0, VISITAS_POR_HORA - visitas);
 }
@@ -178,7 +181,7 @@ function agendar(datos) {
       limpio(datos.forma_de_pago, 30),
       limpio(datos.presupuesto, 60),
       fecha,
-      hora,
+      "'" + hora,
       'Agendada',
       limpio(datos.notas, 300),
       limpio(datos.conversacion, 20),
@@ -196,6 +199,93 @@ function agendar(datos) {
   } finally {
     candado.releaseLock();
   }
+}
+
+// ---- Reagendar ---------------------------------------------------------------
+
+// Columnas de la hoja (1 = A): fecha_visita, hora_visita, estado, id_evento…
+var COL = { telefono: 3, fecha: 7, hora: 8, estado: 9, conversacion: 11, evento: 12 };
+
+function reagendar(datos) {
+  var fecha = limpio(datos.fecha, 10);
+  var hora = limpio(datos.hora, 5);
+  if (!fecha || !/^\d{2}:\d{2}$/.test(hora)) {
+    return { ok: false, error: 'faltan datos: nueva fecha (AAAA-MM-DD) y hora (HH:MM)' };
+  }
+  var inicio = aFecha(fecha, hora);
+  if (isNaN(inicio.getTime())) return { ok: false, error: 'fecha u hora inválida' };
+  var fin = new Date(inicio.getTime() + DURACION_MINUTOS * 60000);
+
+  var diaSemana = Number(Utilities.formatDate(inicio, ZONA, 'u')) % 7;
+  var h = Number(hora.split(':')[0]);
+  if (DIAS_DE_VISITA.indexOf(diaSemana) === -1 || h < HORA_INICIO || h >= HORA_FIN) {
+    return { ok: false, error: 'fuera del horario de visitas', sugerencias: proximosLibres(fecha) };
+  }
+  if (inicio < new Date(Date.now() + ANTICIPACION_MINUTOS * 60000)) {
+    return { ok: false, error: 'muy pronto o en el pasado', sugerencias: proximosLibres(fecha) };
+  }
+
+  var candado = LockService.getScriptLock();
+  candado.waitLock(20000);
+  try {
+    var hoja = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
+    var fila = buscarVisita(hoja, String(datos.conversacion || ''), String(datos.telefono || ''));
+    if (!fila) return { ok: false, error: 'no encontré una visita agendada de esta persona' };
+
+    var calendario = CalendarApp.getDefaultCalendar();
+    var evento = fila.idEvento ? calendario.getEventById(fila.idEvento) : null;
+    if (!evento) return { ok: false, error: 'no encontré la visita en el calendario' };
+
+    var lugares = lugaresLibres(calendario.getEvents(inicio, fin), inicio, fin, evento.getId());
+    if (lugares <= 0) {
+      return { ok: false, error: 'ese horario ya está ocupado', sugerencias: proximosLibres(fecha) };
+    }
+
+    evento.setTime(inicio, fin);
+    hoja.getRange(fila.numero, COL.fecha).setValue(fecha);
+    hoja.getRange(fila.numero, COL.hora).setValue("'" + hora);
+    hoja.getRange(fila.numero, COL.estado).setValue('Reagendada');
+
+    return {
+      ok: true,
+      antes: fila.fecha + ' ' + fila.hora,
+      fecha: fecha,
+      dia_semana: nombreDelDia(fecha),
+      hora: hora,
+      hora_fin: Utilities.formatDate(fin, ZONA, 'HH:mm'),
+      ubicacion: UBICACION
+    };
+  } finally {
+    candado.releaseLock();
+  }
+}
+
+/** La última visita vigente (futura) de esa conversación, o de ese teléfono. */
+function buscarVisita(hoja, conversacion, telefono) {
+  var valores = hoja.getDataRange().getValues();
+  var tel = telefono.replace(/[^\d]/g, '');
+  var ahora = new Date();
+  for (var i = valores.length - 1; i >= 1; i--) {
+    var v = valores[i];
+    var estado = String(v[COL.estado - 1]);
+    if (estado !== 'Agendada' && estado !== 'Reagendada') continue;
+    var mismaCharla = conversacion && String(v[COL.conversacion - 1]) === conversacion;
+    var mismoTel = tel && String(v[COL.telefono - 1]).replace(/[^\d]/g, '') === tel;
+    if (!mismaCharla && !mismoTel) continue;
+    var f = textoDeFecha(v[COL.fecha - 1]);
+    var hh = textoDeHora(v[COL.hora - 1]);
+    if (aFecha(f, hh) < ahora) continue; // ya pasó
+    return { numero: i + 1, fecha: f, hora: hh, idEvento: String(v[COL.evento - 1] || '') };
+  }
+  return null;
+}
+
+// Sheets puede convertir "2026-10-13" en fecha y "10:00" en hora: se normalizan.
+function textoDeFecha(valor) {
+  return valor instanceof Date ? Utilities.formatDate(valor, ZONA, 'yyyy-MM-dd') : String(valor).slice(0, 10);
+}
+function textoDeHora(valor) {
+  return valor instanceof Date ? Utilities.formatDate(valor, ZONA, 'HH:mm') : String(valor).replace("'", '').slice(0, 5);
 }
 
 function proximosLibres(fecha) {
