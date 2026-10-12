@@ -179,9 +179,13 @@ def consultar_lotes(
         )
     if forma != "plazo":
         lineas.append(
-            "REGLA DE DESCUENTO: ofrecé el precio con el descuento inicial. El "
-            "descuento máximo es solo si la persona pide un mejor precio al contado; "
-            "nunca lo ofrezcas de entrada."
+            "CÓMO PRESENTARLO: por cada lote decí la superficie en m², el PRECIO DE "
+            "LISTA, y que al contado tiene un descuento del porcentaje inicial, "
+            "quedando en el precio con descuento. Ejemplo: «Lote de 300 m² en Villa "
+            "Real V: precio de lista USD 16.500; al contado tiene un 30% de descuento, "
+            "quedando en USD 11.550». Nunca des solo el precio con descuento. "
+            "El descuento máximo es solo si la persona pide un mejor precio al "
+            "contado; nunca lo ofrezcas de entrada."
         )
     return "\n".join(lineas)
 
@@ -271,12 +275,13 @@ def _redactar(f: dict, forma: str = "") -> str:
     partes = [f"- {f.get('proyecto', '?')}"]
     if f.get("ubicacion"):
         partes.append(str(f.get("ubicacion")))
-    partes.append(f"{_formato(f.get('superficie_m2'))} m²")
+    partes.append(f"superficie {_formato(f.get('superficie_m2'))} m²")
     if forma != "plazo":
-        partes.append(f"precio de lista USD {_formato(lista)}")
+        partes.append(f"PRECIO DE LISTA USD {_formato(lista)}")
         if inicial:
             partes.append(
-                f"AL CONTADO con {_pct(inicial)} de descuento: USD {_formato(contado_inicial)}"
+                f"al contado tiene {_pct(inicial)} de descuento, quedando en "
+                f"USD {_formato(contado_inicial)}"
             )
         if maximo > inicial:
             partes.append(
@@ -284,6 +289,8 @@ def _redactar(f: dict, forma: str = "") -> str:
                 "solo si pide mejor precio)"
             )
     if forma != "contado" and f.get("plazo_anios"):
+        if forma == "plazo":
+            partes.append(f"precio de lista USD {_formato(lista)}")
         partes.append(
             f"A PLAZO hasta {_formato(f.get('plazo_anios'))} años: cuota inicial USD "
             f"{_formato(f.get('cuota_inicial_usd'))} y cuota mensual USD "
