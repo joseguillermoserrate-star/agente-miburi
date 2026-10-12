@@ -197,7 +197,7 @@ class Lector:
                 return "[Respondiendo a un audio que no puedo escuchar.]", "", ""
             return (
                 "[La persona mandó un audio y no lo puedo escuchar.]",
-                "llegó un audio y no hay cómo escucharlo (falta OPENAI_API_KEY)",
+                "llegó un audio y no hay cómo escucharlo (falta OPENAI_API_KEY o GOOGLE_API_KEY)",
                 "",
             )
 
@@ -519,6 +519,93 @@ class TranscriptorOpenAI:
                 raise ValueError("OpenAI frenó la transcripción: sin saldo o demasiados pedidos (429).") from None
             raise ValueError(f"OpenAI contestó {e.code} al transcribir: {_limpio(detalle)}") from None
         return str(datos_de_vuelta.get("text") or "").strip()
+
+
+# -- O los transcribe Gemini ----------------------------------------------------
+#
+# Para quien usa Gemini (o no quiere sumar una cuenta de OpenAI solo para los
+# audios): Gemini entiende audio de entrada, así que se le manda el archivo
+# tal cual y se le pide la transcripción literal. Los audios de WhatsApp son
+# ogg/opus, que Gemini acepta sin convertir.
+
+URL_DE_GEMINI = "https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
+TOPE_AUDIO_EN_LINEA = 18 * 1024 * 1024  # Gemini acepta hasta ~20 MB adentro del pedido
+
+PEDIDO_DE_TRANSCRIPCION = (
+    "Transcribí este audio palabra por palabra, en el idioma en que está "
+    "hablado. Devolvé solo la transcripción, sin comillas, sin comentarios y "
+    "sin describir sonidos. Si no se entiende nada, devolvé un texto vacío."
+)
+
+
+class TranscriptorGemini:
+    """Pasa un audio a texto con la API de Gemini (sin dependencias nuevas)."""
+
+    def __init__(self, clave: str, modelo: str = "gemini-2.5-flash") -> None:
+        self.clave = clave
+        self.modelo = modelo
+
+    def __repr__(self) -> str:
+        return f"TranscriptorGemini(modelo={self.modelo!r})"  # sin la clave
+
+    def __call__(self, datos: bytes, tipo: str, nombre: str) -> str:
+        if len(datos) > TOPE_AUDIO_EN_LINEA:
+            raise ValueError("El audio es demasiado largo para transcribirlo.")
+        # Chatwoot a veces manda "audio/ogg; codecs=opus": Gemini quiere el tipo pelado.
+        tipo = (tipo or "audio/ogg").split(";")[0].strip() or "audio/ogg"
+        cuerpo = json.dumps(
+            {
+                "contents": [
+                    {
+                        "parts": [
+                            {
+                                "inline_data": {
+                                    "mime_type": tipo,
+                                    "data": base64.b64encode(datos).decode("ascii"),
+                                }
+                            },
+                            {"text": PEDIDO_DE_TRANSCRIPCION},
+                        ]
+                    }
+                ],
+                "generationConfig": {"temperature": 0},
+            }
+        ).encode("utf-8")
+        pedido = urllib.request.Request(
+            URL_DE_GEMINI.format(modelo=urllib.parse.quote(self.modelo, safe="")),
+            data=cuerpo,
+            method="POST",
+            headers={"Content-Type": "application/json"},
+        )
+        # La clave va en un encabezado y «sin redirigir», igual que la de OpenAI.
+        pedido.add_unredirected_header("x-goog-api-key", self.clave)
+        try:
+            with _ABRIDOR_GEMINI.open(pedido, timeout=ESPERA_DE_TRANSCRIPCION) as respuesta:
+                datos_de_vuelta = json.loads(respuesta.read().decode("utf-8") or "{}")
+        except urllib.error.HTTPError as e:
+            detalle = e.read().decode("utf-8", "replace")[:200] if e.fp else ""
+            if e.code in (401, 403):
+                raise ValueError("Google no acepta la clave (GOOGLE_API_KEY) para transcribir.") from None
+            if e.code == 429:
+                raise ValueError("Gemini frenó la transcripción: sin cuota o demasiados pedidos (429).") from None
+            raise ValueError(f"Gemini contestó {e.code} al transcribir: {_limpio(detalle)}") from None
+
+        candidatos = datos_de_vuelta.get("candidates") or []
+        partes = ((candidatos[0].get("content") or {}).get("parts") or []) if candidatos else []
+        return " ".join(str(p.get("text") or "") for p in partes).strip()
+
+
+class _SinRedireccionesGoogle(urllib.request.HTTPRedirectHandler):
+    """Google no redirige esta API: seguirla sería mandarle la clave a otro lado."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise ValueError(f"Gemini contestó con una redirección ({code}): no la sigo.")
+
+
+_ABRIDOR_GEMINI = urllib.request.build_opener(
+    _SinRedireccionesGoogle,
+    urllib.request.HTTPSHandler(context=ssl.create_default_context()),
+)
 
 
 def _campo(limite: str, nombre: str, valor: str) -> bytes:

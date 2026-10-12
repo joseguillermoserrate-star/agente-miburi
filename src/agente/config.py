@@ -107,6 +107,11 @@ class Config:
     transcribir_audios: bool = True
     modelo_transcripcion: str = "gpt-4o-mini-transcribe"
     clave_openai: str = field(default="", repr=False)
+    # Si no hay clave de OpenAI pero sí de Google, los audios los transcribe
+    # Gemini (entiende audio de entrada). Por defecto, con el mismo modelo
+    # Gemini del agente; MODELO_TRANSCRIPCION_GEMINI lo cambia.
+    clave_gemini: str = field(default="", repr=False)
+    modelo_transcripcion_gemini: str = "gemini-2.5-flash"
 
     # -- El ritmo de persona ----------------------------------------------------
     # Entre globo y globo, lo que tardaría alguien en tipearlo.
@@ -240,6 +245,12 @@ class Config:
                 os.getenv("MODELO_TRANSCRIPCION") or "gpt-4o-mini-transcribe"
             ).strip(),
             clave_openai=(os.getenv("OPENAI_API_KEY") or "").strip(),
+            clave_gemini=(os.getenv("GOOGLE_API_KEY") or "").strip(),
+            modelo_transcripcion_gemini=(
+                os.getenv("MODELO_TRANSCRIPCION_GEMINI")
+                or os.getenv("MODELO_GEMINI")
+                or "gemini-2.5-flash"
+            ).strip(),
             pausa_entre_globos=_booleano("PAUSA_ENTRE_GLOBOS", True),
             espera_segundos=espera_segundos,
             silencio_segundos=silencio_segundos,

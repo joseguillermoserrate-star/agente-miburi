@@ -49,7 +49,7 @@ from fastapi.responses import JSONResponse
 
 from ..agente import Agente
 from ..avisos import Avisos
-from ..canales.adjuntos import DescriptorDeFotos, Lector, TranscriptorOpenAI
+from ..canales.adjuntos import DescriptorDeFotos, Lector, TranscriptorGemini, TranscriptorOpenAI
 from ..canales.base import MensajeEntrante
 from ..canales.buffer import BufferDeMensajes
 from ..canales.chatwoot import Chatwoot, tarda_en_escribir
@@ -105,7 +105,7 @@ MAIL_DE_ADJUNTO = """El agente no pudo leer algo que le mandaron en una conversa
 A la persona se le pidió que lo cuente por escrito, así que la charla sigue.
 La conversación: {enlace}
 
-Si pasa con todos los audios, revisá OPENAI_API_KEY (la clave o el saldo).
+Si pasa con todos los audios, revisá OPENAI_API_KEY o GOOGLE_API_KEY (la clave o el saldo).
 De un mismo error te llega un mail por hora como mucho."""
 
 CAUSA_MODELO = (
@@ -192,6 +192,9 @@ def armar_lector(config: Config, canal: Chatwoot) -> Lector:
     transcribir = None
     if config.transcribir_audios and config.clave_openai:
         transcribir = TranscriptorOpenAI(config.clave_openai, config.modelo_transcripcion)
+    elif config.transcribir_audios and config.clave_gemini:
+        # Sin OpenAI, pero con Gemini: Gemini entiende audio, así que transcribe él.
+        transcribir = TranscriptorGemini(config.clave_gemini, config.modelo_transcripcion_gemini)
     return Lector(canal, describir=describir, transcribir=transcribir)
 
 
@@ -525,7 +528,7 @@ def crear_app(
             config.tope_mensajes_por_dia or "sin",
             _como_avisa(avisos),
             "sí" if getattr(lector, "describir", None) else "no",
-            "sí" if getattr(lector, "transcribir", None) else "no (falta OPENAI_API_KEY: pasan a una persona)",
+            "sí" if getattr(lector, "transcribir", None) else "no (falta OPENAI_API_KEY o GOOGLE_API_KEY: pasan a una persona)",
             "calla al agente" if config.respetar_resueltas else "no cambia nada",
         )
         cuidar_el_permiso = (
