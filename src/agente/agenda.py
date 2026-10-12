@@ -205,7 +205,8 @@ def _aviso_del_ejecutivo() -> str:
     nombre = (os.getenv("EJECUTIVO_VENTAS") or "Juan de Dios Rodríguez").strip()
     return (
         f"El ejecutivo de ventas asignado será {nombre}, quien se contactará "
-        "con usted para confirmar su visita."
+        "con usted para confirmar su visita. La empresa le proporcionará el "
+        "transporte desde el punto de encuentro hasta el proyecto urbanístico."
     )
 
 
