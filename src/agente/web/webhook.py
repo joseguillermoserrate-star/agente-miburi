@@ -229,6 +229,7 @@ def crear_app(
         token=config.chatwoot_token,
         cuenta_id=config.chatwoot_cuenta_id,
         etiqueta_humano=config.chatwoot_etiqueta_humano,
+        explicar_con_nota=config.notas_privadas,
     )
 
     # El agente se arma una sola vez y atiende a todo el mundo. Es lo que
@@ -384,7 +385,7 @@ def crear_app(
                     # una persona. Va después de mandar: si el envío fallaba, la
                     # persona quedaba sin respuesta y sin nadie que la atienda.
                     try:
-                        await asyncio.to_thread(canal.pasar_a_persona, conversacion)
+                        await asyncio.to_thread(canal.pasar_a_persona, conversacion, "respondió el primer mensaje y, como está configurado (SOLO_EL_PRIMER_MENSAJE), la sigue una persona.")
                         registro.info("[%s] contestó el primero: sigue una persona", conversacion)
                     except Exception as e:
                         registro.error("[%s] no se pudo pasar a una persona: %s", conversacion, e)
@@ -403,7 +404,7 @@ def crear_app(
         registro.error("[%s] %s", conversacion, _CONTROL.sub(" ", aviso))
 
         try:
-            await asyncio.to_thread(canal.pasar_a_persona, conversacion)
+            await asyncio.to_thread(canal.pasar_a_persona, conversacion, f"falló algo al responder ({type(error).__name__}: {str(error)[:300]}). Sacale la etiqueta «humano» cuando esté resuelto.")
             etiquetada = True
         except Exception as e:
             registro.error("[%s] no se pudo poner la etiqueta: %s", conversacion, e)
@@ -438,7 +439,7 @@ def crear_app(
             tope.tope,
         )
         try:
-            await asyncio.to_thread(canal.pasar_a_persona, conversacion)
+            await asyncio.to_thread(canal.pasar_a_persona, conversacion, f"pasó el tope de {tope.tope} mensajes en 24 horas (TOPE_MENSAJES_POR_DIA). Sacale la etiqueta «humano» para que vuelva a atender.")
         except Exception as e:
             # Sin la etiqueta, pasado el rato de gracia la persona vuelve a
             # tener respuestas: eso sí hay que avisarlo.
@@ -461,7 +462,7 @@ def crear_app(
         figura como resuelta). La etiqueta, en cambio, se queda.
         """
         try:
-            await asyncio.to_thread(canal.pasar_a_persona, conversacion)
+            await asyncio.to_thread(canal.pasar_a_persona, conversacion, "esta persona tiene una conversación RESUELTA en Chatwoot y RESPETAR_RESUELTAS=1. Para que vuelva a atender: reabrí sus conversaciones resueltas y sacale la etiqueta «humano».")
             registro.info("[%s] la resolvieron: el agente no le vuelve a hablar", conversacion)
         except Exception as e:
             registro.error("[%s] no se pudo marcar como resuelta: %s", conversacion, e)
@@ -496,7 +497,7 @@ def crear_app(
         if leido.a_una_persona:
             registro.info("[%s] pasa a una persona: %s", conversacion, leido.a_una_persona)
             try:
-                await asyncio.to_thread(canal.pasar_a_persona, conversacion)
+                await asyncio.to_thread(canal.pasar_a_persona, conversacion, f"{leido.a_una_persona}. Sacale la etiqueta «humano» cuando la atiendas.")
             except Exception as e:
                 registro.error("[%s] no se pudo pasar a una persona: %s", conversacion, e)
         if leido.error:

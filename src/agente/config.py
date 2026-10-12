@@ -62,6 +62,8 @@ class Config:
     chatwoot_url: str = ""
     chatwoot_token: str = field(default="", repr=False)
     chatwoot_cuenta_id: str = "1"
+    # Al pasar a una persona, una nota privada en Chatwoot con el motivo.
+    notas_privadas: bool = False
     # La etiqueta que apaga al bot en una conversación: el traspaso a una
     # persona. Se pone con un clic desde la bandeja de Chatwoot.
     chatwoot_etiqueta_humano: str = "humano"
@@ -224,6 +226,7 @@ class Config:
             postgres_dsn=(os.getenv("POSTGRES_DSN") or "").strip(),
             telegram_token=(os.getenv("TELEGRAM_TOKEN") or "").strip(),
             chatwoot_url=(os.getenv("CHATWOOT_URL") or "").strip(),
+            notas_privadas=_booleano("NOTAS_PRIVADAS", False),
             chatwoot_token=(os.getenv("CHATWOOT_TOKEN") or "").strip(),
             chatwoot_cuenta_id=(os.getenv("CHATWOOT_CUENTA_ID") or "1").strip(),
             chatwoot_etiqueta_humano=(

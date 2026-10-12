@@ -100,6 +100,7 @@ class Chatwoot(Canal):
         token: str,
         cuenta_id: str | int,
         etiqueta_humano: str = "humano",
+        explicar_con_nota: bool = False,
     ) -> None:
         if not url or not token:
             raise ValueError(
@@ -112,6 +113,7 @@ class Chatwoot(Canal):
         self.token = token
         self.cuenta_id = str(cuenta_id)
         self.etiqueta_humano = (etiqueta_humano or "").strip().lower()
+        self.explicar_con_nota = bool(explicar_con_nota)
 
         # Los mensajes que ya contestamos. Chatwoot reintenta el webhook si no
         # le respondemos rápido, y sin esto el agente contesta dos veces lo
@@ -377,7 +379,7 @@ class Chatwoot(Canal):
                 {"content": texto, "message_type": "outgoing"},
             )
 
-    def pasar_a_persona(self, conversacion: str) -> None:
+    def pasar_a_persona(self, conversacion: str, motivo: str = "") -> None:
         """Le pone la etiqueta del traspaso: el agente se calla en esa conversación.
 
         Ojo con esto, que borra datos si se hace mal: en Chatwoot, mandar las
@@ -402,6 +404,25 @@ class Chatwoot(Canal):
             f"conversations/{conversacion}/labels",
             {"labels": etiquetas + [self.etiqueta_humano]},
         )
+        if motivo and self.explicar_con_nota:
+            self._nota_privada(conversacion, f"🤖 El agente se calló en esta conversación: {motivo}")
+
+    def _nota_privada(self, conversacion: str, texto: str) -> None:
+        """Una nota que ve el equipo en Chatwoot y el cliente no (NOTAS_PRIVADAS=1).
+
+        Apagado por defecto: lo normal es enterarse por el mail de avisos.
+        Prendido sirve a quien no configuró el mail: al ver la etiqueta, la
+        nota dice POR QUÉ el agente se calló, sin entrar a los registros.
+        Si falla, no pasa nada: la etiqueta ya está puesta, que es lo importante.
+        """
+        try:
+            self._api(
+                "POST",
+                f"conversations/{conversacion}/messages",
+                {"content": texto[:1000], "message_type": "outgoing", "private": True},
+            )
+        except Exception:
+            pass
 
     def enlace(self, conversacion: str) -> str:
         """La dirección de la conversación en la bandeja. Va en los avisos por mail."""
