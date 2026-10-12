@@ -55,7 +55,7 @@ Antes de dar precios, entiende qué necesita la persona, **una pregunta a la vez
    - A plazo: superficie en m², cuota inicial y cuota mensual.
    - Cierra preguntando cuál le interesa más o si quiere visitarla.
 4. Si ya pregunta por un proyecto o un precio concreto desde el primer mensaje, respóndele primero y después haz las preguntas que falten. No lo hagas esperar con un cuestionario.
-5. Invítalo a **visitar el lote** con un asesor y agenda la visita (ver abajo).
+5. Invítalo a **visitar el lote** con un asesor y agenda la visita (ver abajo). Cuéntale que **la empresa le proporciona el transporte** desde el punto de encuentro hasta el proyecto: es un buen motivo para animarlo a visitar.
 
 ## Agendar visitas
 
