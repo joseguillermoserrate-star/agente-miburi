@@ -517,6 +517,19 @@ def crear_app(
         # puesto antes de eso se puede perder.
         tapar_el_token_en_los_registros(config.chatwoot_webhook_token)
 
+        # Cada respuesta pasa varios segundos esperando a Gemini, Chatwoot o
+        # Google: es espera de red, no trabajo de CPU. Python, por defecto,
+        # deja tantos hilos como núcleos + 4 (en un VPS de 1 núcleo, 5): con
+        # 6 personas escribiendo a la vez, la sexta esperaba en fila. Con más
+        # hilos atienden todas juntas. HILOS lo ajusta.
+        import os
+        from concurrent.futures import ThreadPoolExecutor
+
+        hilos = max(4, int(os.getenv("HILOS", "32") or 32))
+        asyncio.get_running_loop().set_default_executor(
+            ThreadPoolExecutor(max_workers=hilos, thread_name_prefix="agente")
+        )
+
         registro.info(
             "Agente escuchando - %s / %s - memoria %s - buffer %ss - "
             "%s mensaje(s) por respuesta - tope %s por día - avisos %s - "
