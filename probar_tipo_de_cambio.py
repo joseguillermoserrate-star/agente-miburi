@@ -16,6 +16,11 @@ from agente.tipo_cambio import leer_bcb, tipo_de_cambio  # noqa: E402
 
 
 def main() -> int:
+    from agente.precios import tipo_de_cambio_de_la_hoja
+
+    print("0) Hoja de precios, pestaña «Tipo de cambio»…")
+    hoja = tipo_de_cambio_de_la_hoja()
+    print(f"   {'✓ Bs ' + str(hoja) if hoja else '✗ No está (se usa el BCB)'}")
     print("1) Leyendo la página del Banco Central…")
     try:
         valor = leer_bcb()
@@ -30,7 +35,7 @@ def main() -> int:
     print(f"2) Lo que usará el agente: {tasa or 'nada (no convertirá)'} ({origen or '-'})")
     if tasa:
         print(f"   Ejemplo: USD 11.550 = Bs {11550 * tasa:,.0f}".replace(",", "."))
-    return 0 if valor else 1
+    return 0 if (tasa) else 1
 
 
 if __name__ == "__main__":

@@ -51,7 +51,7 @@ OPCIONES_MAXIMAS = 2
 
 registro = logging.getLogger(__name__)
 
-_cache: dict = {"momento": 0.0, "filas": None}
+_cache: dict = {"momento": 0.0, "filas": None, "tipo_cambio": 0.0}
 
 
 @tool
@@ -262,8 +262,23 @@ def _bajar_la_hoja() -> list[dict]:
 
     filas = datos.get("filas") or []
     _cache["filas"] = filas
+    # El tipo de cambio (Bs por dólar) que el dueño escribe en la pestaña
+    # «Tipo de cambio» de la misma hoja. 0 = no está.
+    _cache["tipo_cambio"] = _numero(datos.get("tipo_cambio"))
     _cache["momento"] = time.time()
     return filas
+
+
+def tipo_de_cambio_de_la_hoja() -> float:
+    """Bs por dólar escrito en la hoja de precios, o 0 si no está."""
+    if not (os.getenv("PRECIOS_URL") or "").strip():
+        return 0.0
+    try:
+        _traer_filas()
+    except Exception as e:  # noqa: BLE001
+        registro.warning("No se pudo leer la hoja de precios: %s", e)
+    valor = _cache.get("tipo_cambio") or 0.0
+    return valor if 1 < valor < 100 else 0.0
 
 
 def _precios_contado(f: dict) -> tuple[float, float]:

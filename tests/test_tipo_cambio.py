@@ -11,6 +11,26 @@ PAGINA = """
 def _limpiar(monkeypatch):
     tc._cache.update(momento=0.0, valor=None, fecha="")
     monkeypatch.delenv("TIPO_DE_CAMBIO_BOB", raising=False)
+    monkeypatch.delenv("PRECIOS_URL", raising=False)
+
+
+def test_la_hoja_de_precios_manda(monkeypatch):
+    from agente import precios
+
+    _limpiar(monkeypatch)
+    monkeypatch.setenv("PRECIOS_URL", "https://ejemplo/exec")
+    monkeypatch.setattr(precios, "_traer_filas", lambda: [])
+    monkeypatch.setitem(precios._cache, "tipo_cambio", 11.8)
+    monkeypatch.setattr(tc, "leer_bcb", lambda: 11.73)
+    texto = tc.convertir_a_bolivianos.invoke({"montos_usd": [1000]})
+    assert "Bs 11,80 por dólar" in texto
+    assert "Bs 11.800" in texto
+
+
+def test_el_dato_de_la_hoja_se_lee_con_coma(monkeypatch):
+    from agente import precios
+
+    assert precios._numero("11,73") == 11.73
 
 
 def test_extrae_el_tco_de_la_tabla_del_bcb():

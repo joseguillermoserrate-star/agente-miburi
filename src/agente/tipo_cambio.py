@@ -1,10 +1,17 @@
 """Herramienta: pasar a bolivianos un precio en dólares, al tipo de cambio del día.
 
 Los precios se venden en dólares. Solo si la persona pregunta cuánto es en
-bolivianos, el agente usa esta herramienta: lee el Tipo de Cambio Oficial
-(TCO, Bs/USD) que publica el Banco Central de Bolivia en
-https://www.bcb.gob.bo/?q=cotizaciones_tc (fila «ESTADOS UNIDOS · DÓLAR · USD»)
-y hace la cuenta acá, no el modelo: así no hay errores de multiplicación.
+bolivianos, el agente usa esta herramienta, y la cuenta se hace acá, no en el
+modelo: así no hay errores de multiplicación.
+
+De dónde sale el tipo de cambio, en este orden:
+
+1. La pestaña «Tipo de cambio» de la hoja de precios (celda B1), que el dueño
+   actualiza con el valor del Banco Central. Manda sobre todo lo demás.
+2. La página del Banco Central de Bolivia
+   (https://www.bcb.gob.bo/?q=cotizaciones_tc, fila «ESTADOS UNIDOS · DÓLAR ·
+   USD»), si la hoja no tiene el dato.
+3. TIPO_DE_CAMBIO_BOB, como último respaldo.
 
 Variables de entorno (opcionales):
 
@@ -75,7 +82,17 @@ def convertir_a_bolivianos(montos_usd: list[float]) -> str:
 
 
 def tipo_de_cambio() -> tuple[float | None, str]:
-    """(Bs por dólar, de dónde salió). Cachea el valor unas horas."""
+    """(Bs por dólar, de dónde salió)."""
+    from .precios import tipo_de_cambio_de_la_hoja
+
+    de_la_hoja = tipo_de_cambio_de_la_hoja()
+    if de_la_hoja:
+        return de_la_hoja, "vigente hoy " + _hoy_bolivia()
+    return _del_bcb_o_respaldo()
+
+
+def _del_bcb_o_respaldo() -> tuple[float | None, str]:
+    """El valor del BCB (cacheado unas horas) o el respaldo del .env."""
     ahora = time.time()
     with _candado:
         if _cache["valor"] and ahora - _cache["momento"] < VIGENCIA:
