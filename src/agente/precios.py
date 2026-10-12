@@ -46,8 +46,8 @@ ESPERA = 20  # segundos: Apps Script a veces tarda en despertar
 
 # Cuántas opciones se le pasan al modelo. Pocas a propósito: en WhatsApp una
 # lista larga de precios abruma, y el modelo tiende a repetir todo lo que ve.
-OPCIONES_POR_DEFECTO = 3
-OPCIONES_MAXIMAS = 5
+OPCIONES_POR_DEFECTO = 2
+OPCIONES_MAXIMAS = 2
 
 registro = logging.getLogger(__name__)
 
@@ -83,7 +83,8 @@ def consultar_lotes(
             pagar, en dólares. 0 = no lo dijo.
         proyecto: Solo si pregunta por un proyecto puntual, por ejemplo
             "Villa Real V". Vacío = todos los proyectos.
-        cantidad_de_opciones: Cuántas opciones devolver (1 a 5). Por defecto 3.
+        cantidad_de_opciones: Cuántas opciones devolver (1 o 2). Por defecto 2:
+            nunca se muestran más de 2 a la vez.
         incluir_no_disponibles: True solo si preguntan específicamente por
             lotes reservados o vendidos.
         cliente_pide_mejor_precio: True SOLO si la persona, al contado, pidió

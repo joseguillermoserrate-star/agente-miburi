@@ -33,6 +33,7 @@ from langchain_core.tools import tool
 
 from .agenda import HERRAMIENTAS_DE_AGENDA
 from .precios import consultar_lotes
+from .tipo_cambio import convertir_a_bolivianos
 
 GEOCODING = "https://geocoding-api.open-meteo.com/v1/search"
 PRONOSTICO = "https://api.open-meteo.com/v1/forecast"
@@ -117,7 +118,7 @@ def clima(lugar: str) -> str:
 
 # Lo que el agente tiene atado. Cuando agregues otra herramienta, sumala acá:
 # es la única lista que mira el grafo.
-HERRAMIENTAS = [clima, consultar_lotes, *HERRAMIENTAS_DE_AGENDA]
+HERRAMIENTAS = [clima, consultar_lotes, convertir_a_bolivianos, *HERRAMIENTAS_DE_AGENDA]
 
 
 # -- Las consultas ------------------------------------------------------------
