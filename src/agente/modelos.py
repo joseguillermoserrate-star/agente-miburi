@@ -24,7 +24,9 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:  # pragma: no cover
     from langchain_core.language_models import BaseChatModel
 
-PROVEEDORES = ("claude", "openai", "gemini")
+PROVEEDORES = ("claude", "openai", "gemini", "openrouter")
+
+OPENROUTER_URL = "https://openrouter.ai/api/v1"
 
 
 # ---------------------------------------------------------------------------
@@ -105,8 +107,36 @@ def crear_modelo(
             timeout=120,
         )
 
+    if proveedor == "openrouter":
+        # OpenRouter habla el mismo idioma que OpenAI (/chat/completions), así
+        # que se usa el mismo cliente apuntando a otra dirección. Con una sola
+        # clave da acceso a Claude, Gemini, GPT, Llama, DeepSeek, etc.: el
+        # modelo se elige con MODELO_OPENROUTER, por ejemplo
+        # "anthropic/claude-sonnet-5.5" o "anthropic/claude-haiku-5.5".
+        #
+        # A diferencia de la rama de OpenAI, acá va el endpoint clásico de
+        # chat: es el que OpenRouter soporta para todos los modelos, con
+        # herramientas incluidas.
+        try:
+            from langchain_openai import ChatOpenAI
+        except ImportError:
+            raise ImportError(
+                "Falta el paquete de OpenAI: pip install langchain-openai"
+            ) from None
+
+        return ChatOpenAI(
+            model=modelo,
+            api_key=api_key,
+            base_url=OPENROUTER_URL,
+            max_tokens=max_tokens,
+            timeout=120,
+            stream_usage=True,
+            default_headers={"X-Title": "Agente WhatsApp"},
+        )
+
     raise ValueError(
-        f"No conozco el proveedor '{proveedor}'. Usá: claude, openai o gemini."
+        f"No conozco el proveedor '{proveedor}'. "
+        "Usá: claude, openai, gemini u openrouter."
     )
 
 
@@ -183,6 +213,8 @@ def listar_modelos(proveedor: str, api_key: str) -> list[dict]:
             modelos = _modelos_openai(api_key)
         elif proveedor == "gemini":
             modelos = _modelos_gemini(api_key)
+        elif proveedor == "openrouter":
+            modelos = _modelos_openrouter()
         else:
             return []
     except Exception:
@@ -235,6 +267,26 @@ def _modelos_openai(api_key: str) -> list[dict]:
     # OpenAI no informa el tope de salida en su listado: queda en None y la
     # plataforma usa el valor que tengas puesto.
     return [{"id": m.id, "nombre": m.id, "max_salida": None} for m in modelos]
+
+
+def _modelos_openrouter() -> list[dict]:
+    """La lista pública de OpenRouter (no pide clave), con el tope de salida."""
+    import json
+    import urllib.request
+
+    with urllib.request.urlopen(f"{OPENROUTER_URL}/models", timeout=15) as r:
+        datos = json.loads(r.read().decode("utf-8")).get("data") or []
+
+    datos.sort(key=lambda m: m.get("created") or 0, reverse=True)
+    return [
+        {
+            "id": m["id"],
+            "nombre": m.get("name") or m["id"],
+            "max_salida": (m.get("top_provider") or {}).get("max_completion_tokens"),
+        }
+        for m in datos
+        if "tools" in (m.get("supported_parameters") or [])
+    ]
 
 
 def _es_chat_de_openai(identificador: str) -> bool:

@@ -17,7 +17,7 @@ RAIZ = Path(__file__).resolve().parents[2]
 load_dotenv(RAIZ / ".env")
 
 
-PROVEEDORES_VALIDOS = ("claude", "openai", "gemini")
+PROVEEDORES_VALIDOS = ("claude", "openai", "gemini", "openrouter")
 MODOS_VALIDOS = ("test", "produccion")
 
 # Qué variable de entorno lleva la clave de cada proveedor
@@ -25,12 +25,14 @@ CLAVE_POR_PROVEEDOR = {
     "claude": "ANTHROPIC_API_KEY",
     "openai": "OPENAI_API_KEY",
     "gemini": "GOOGLE_API_KEY",
+    "openrouter": "OPENROUTER_API_KEY",
 }
 
 MODELOS_POR_DEFECTO = {
     "claude": "claude-opus-5",
     "openai": "gpt-5",
     "gemini": "gemini-2.5-pro",
+    "openrouter": "anthropic/claude-sonnet-5.5",
 }
 
 
