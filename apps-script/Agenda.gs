@@ -23,8 +23,8 @@ var TOKEN = 'PEGA_AQUI_TU_TOKEN';
 var ZONA = 'America/La_Paz';
 var DESFASE = '-04:00';            // Bolivia no tiene horario de verano
 var DIAS_DE_VISITA = [1, 2, 3, 4, 5, 6]; // 0=domingo … 6=sábado
-var HORA_INICIO = 8;               // primera visita: 08:00
-var HORA_FIN = 18;                 // última visita empieza a las 17:00
+var HORA_INICIO = 9;               // primera visita: 09:00
+var HORA_FIN = 16;                 // última visita empieza a las 15:00 (termina 16:00)
 var VISITAS_POR_HORA = 2;
 var DURACION_MINUTOS = 60;
 var ANTICIPACION_MINUTOS = 120;    // no agendar con menos de 2 h de aviso
