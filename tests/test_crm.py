@@ -253,3 +253,35 @@ def test_el_webhook_alimenta_el_panel(base, monkeypatch):
     assert datos["chatwoot"].endswith("/conversations/")
     assert csv.status_code == 200
     assert "conversacion;nombre" in csv.text
+
+
+def test_comparativo_acciones_y_segmentos(base):
+    ahora = time.time()
+    t = ahora - 2 * 86400
+    # Período actual: uno calificado que no avanzó (recontactar) y una visita sin confirmar.
+    base.lead("1", primer_contacto=t, ultimo_mensaje=t + 100, forma_pago="contado", presupuesto_usd=9000,
+              origen="Anuncio Meta", proyecto="Villa Real IV")
+    base.evento("1", "mensaje", "cliente", {}, t)
+    manana = time.strftime("%Y-%m-%d", time.localtime(ahora + 86400 * 2))
+    base.lead("2", primer_contacto=t, ultimo_mensaje=t, forma_pago="plazo", cuota_usd=150, visita=f"{manana} 10:00",
+              visita_en=t + 50, origen="WhatsApp directo")
+    base.evento("2", "mensaje", "cliente", {}, t)
+    base.evento("2", "visita_agendada", "ia", {}, t + 50)
+    # Derivado sin respuesta.
+    base.lead("3", primer_contacto=t, ultimo_mensaje=t, derivado_en=t + 10, derivado_motivo="quiere reservar", origen="Anuncio Meta")
+    # Período anterior: un lead.
+    base.lead("4", primer_contacto=ahora - 40 * 86400, origen="WhatsApp directo")
+
+    r = armar(base.leads(), base.eventos())
+    assert r["comparativo"]["leads"] == 1
+    assert r["general"]["leads"] == 3
+    ac = r["acciones"]
+    assert [x["conversacion"] for x in ac["visitas"]] == ["2"]
+    assert [x["conversacion"] for x in ac["derivaciones"]] == ["3"]
+    assert [x["conversacion"] for x in ac["recontactar"]] == ["1"]
+    origen = {x["nombre"]: x for x in r["segmentos"]["origen"]}
+    assert origen["Anuncio Meta"]["leads"] == 2
+    assert origen["Anuncio Meta"]["derivacion"] == 50.0
+    assert r["presupuestos"]["contado_mediana"] == 9000
+    assert sum(sum(f) for f in r["horarios"]) == 2
+    assert r["productividad"]["visitas_confirmadas"] == 0.0

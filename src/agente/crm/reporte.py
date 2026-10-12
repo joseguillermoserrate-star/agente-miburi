@@ -75,24 +75,7 @@ def armar(leads: list[dict], eventos: list[dict], desde: str = "", hasta: str = 
     for e in eventos:
         por_conv[e["conversacion"]].append(e)
 
-    # Un lead entra al reporte si su primer mensaje cayó en el rango. Si no se
-    # registró el primer mensaje (por ejemplo, la persona del equipo escribió
-    # primero), vale el primer evento de esa conversación.
-    fichas = []
-    for lead in leads:
-        conv = lead["conversacion"]
-        primero = lead.get("primer_contacto") or min(
-            (e["momento"] for e in por_conv.get(conv, [])), default=None
-        )
-        if not en_rango(primero):
-            continue
-        ficha = dict(lead)
-        ficha["primer_contacto"] = primero
-        ficha["estado"], ficha["calidad"] = _estado(ficha, ahora)
-        ficha["mensajes"] = Counter(
-            e["actor"] for e in por_conv.get(conv, []) if e["tipo"] == "mensaje"
-        )
-        fichas.append(ficha)
+    fichas = _fichas(leads, por_conv, inicio, fin, ahora)
 
     total = len(fichas)
     calificados = sum(1 for f in fichas if _calificado(f))
@@ -118,8 +101,23 @@ def armar(leads: list[dict], eventos: list[dict], desde: str = "", hasta: str = 
     )
 
     tiempos = _tiempos(por_conv, inicio, fin, ahora)
+    tiempos.update(_calidad_de_atencion(fichas, por_conv, inicio, fin))
+
+    # El período anterior, del mismo largo: ¿vamos mejor o peor?
+    largo = fin - inicio
+    anteriores = _fichas(leads, por_conv, inicio - largo, inicio, ahora)
+    anterior = _generales(anteriores)
 
     return {
+        "comparativo": {
+            "desde": (d - timedelta(days=(h - d).days + 1)).isoformat(),
+            "hasta": (d - timedelta(days=1)).isoformat(),
+            **anterior,
+        },
+        "acciones": _acciones(leads, por_conv, ahora),
+        "segmentos": _segmentos(fichas),
+        "presupuestos": _presupuestos(fichas),
+        "horarios": _horarios(del_rango),
         "rango": {"desde": d.isoformat(), "hasta": h.isoformat()},
         "generado": datetime.fromtimestamp(ahora, zona()).strftime("%d/%m/%Y %H:%M"),
         "general": {
@@ -133,6 +131,7 @@ def armar(leads: list[dict], eventos: list[dict], desde: str = "", hasta: str = 
             "conversion_visita": _pct(con_visita, total),
             "conversion_derivacion": _pct(derivados, total),
             "conversion_calificado": _pct(calificados, total),
+            "conversion_avance": _pct(visita_o_derivado, total),
             "visitas_agendadas_en_rango": sum(visitas_por_dia.values()),
             "reagendadas_en_rango": sum(1 for e in del_rango if e["tipo"] == "visita_reagendada"),
             "traspasos_sistema": sum(1 for e in del_rango if e["tipo"] == "traspaso"),
@@ -176,6 +175,247 @@ def armar(leads: list[dict], eventos: list[dict], desde: str = "", hasta: str = 
 
 
 # -- Por dentro -------------------------------------------------------------
+
+
+def _fichas(leads: list[dict], por_conv: dict, inicio: float, fin: float, ahora: float) -> list[dict]:
+    """Los leads cuyo primer mensaje cayó en [inicio, fin), con su estado.
+
+    Si no se registró el primer mensaje (por ejemplo, la persona del equipo
+    escribió primero), vale el primer evento de esa conversación.
+    """
+    fichas = []
+    for lead in leads:
+        conv = lead["conversacion"]
+        primero = lead.get("primer_contacto") or min(
+            (e["momento"] for e in por_conv.get(conv, [])), default=None
+        )
+        if not primero or not (inicio <= float(primero) < fin):
+            continue
+        ficha = dict(lead)
+        ficha["primer_contacto"] = float(primero)
+        ficha["estado"], ficha["calidad"] = _estado(ficha, ahora)
+        ficha["mensajes"] = Counter(
+            e["actor"] for e in por_conv.get(conv, []) if e["tipo"] == "mensaje"
+        )
+        fichas.append(ficha)
+    return fichas
+
+
+def _generales(fichas: list[dict]) -> dict:
+    total = len(fichas)
+    calificados = sum(1 for f in fichas if _calificado(f))
+    visitas = sum(1 for f in fichas if f.get("visita"))
+    derivados = sum(1 for f in fichas if f.get("derivado_en"))
+    avanzan = sum(1 for f in fichas if f.get("visita") or f.get("derivado_en"))
+    return {
+        "leads": total,
+        "calificados": calificados,
+        "visitas": visitas,
+        "derivados": derivados,
+        "visita_o_derivado": avanzan,
+        "malos": sum(1 for f in fichas if f["estado"] == "malo"),
+        "conversion_calificado": _pct(calificados, total),
+        "conversion_visita": _pct(visitas, total),
+        "conversion_derivacion": _pct(derivados, total),
+        "conversion_avance": _pct(avanzan, total),
+    }
+
+
+def _segmentos(fichas: list[dict]) -> dict:
+    """Conversión por origen, campaña, proyecto, motivo y forma de pago.
+
+    Para decidir dónde poner la plata y el esfuerzo: no alcanza con saber
+    cuántos leads trae un anuncio, hay que ver cuántos llegan a visita.
+    """
+    dimensiones = {
+        "origen": ("origen", "Sin dato", None),
+        "campana": ("campana", "Sin campaña", None),
+        "proyecto": ("proyecto", "Sin definir", None),
+        "motivo": ("motivo_compra", "Sin dato", {"inversion": "Inversión", "vivienda": "Vivienda"}),
+        "forma_pago": ("forma_pago", "Sin dato", {"contado": "Contado", "plazo": "A plazo"}),
+    }
+    salida = {}
+    for clave, (campo, vacio, nombres) in dimensiones.items():
+        grupos: dict[str, list[dict]] = defaultdict(list)
+        for f in fichas:
+            valor = str(f.get(campo) or "").strip()
+            if valor:
+                valor = (nombres or {}).get(valor.lower(), valor)
+                if campo == "proyecto":
+                    valor = _titulo(valor)
+            grupos[valor or vacio].append(f)
+        filas = []
+        for nombre, grupo in grupos.items():
+            g = _generales(grupo)
+            filas.append(
+                {
+                    "nombre": nombre,
+                    "leads": g["leads"],
+                    "calificados": g["conversion_calificado"],
+                    "visita": g["conversion_visita"],
+                    "derivacion": g["conversion_derivacion"],
+                    "avance": g["conversion_avance"],
+                    "malos": _pct(g["malos"], g["leads"]),
+                }
+            )
+        salida[clave] = sorted(filas, key=lambda x: -x["leads"])
+    return salida
+
+
+TRAMOS_CONTADO = [(0, 8000), (8000, 10000), (10000, 12000), (12000, 15000), (15000, None)]
+TRAMOS_CUOTA = [(0, 100), (100, 150), (150, 200), (200, 300), (300, None)]
+
+
+def _tramos(valores: list[float], tramos) -> list[dict]:
+    salida = []
+    for desde, hasta in tramos:
+        n = sum(1 for v in valores if v >= desde and (hasta is None or v < hasta))
+        if hasta is None:
+            nombre = f"USD {desde:,.0f} o más"
+        elif desde == 0:
+            nombre = f"Menos de USD {hasta:,.0f}"
+        else:
+            nombre = f"USD {desde:,.0f} a {hasta:,.0f}"
+        salida.append({"nombre": nombre.replace(",", "."), "valor": n})
+    return salida
+
+
+def _presupuestos(fichas: list[dict]) -> dict:
+    contado = [float(f["presupuesto_usd"]) for f in fichas if f.get("presupuesto_usd")]
+    cuotas = [float(f["cuota_usd"]) for f in fichas if f.get("cuota_usd")]
+    con_visita_contado = [
+        float(f["presupuesto_usd"])
+        for f in fichas
+        if f.get("presupuesto_usd") and (f.get("visita") or f.get("derivado_en"))
+    ]
+    return {
+        "contado": _tramos(contado, TRAMOS_CONTADO),
+        "cuota": _tramos(cuotas, TRAMOS_CUOTA),
+        "contado_mediana": round(statistics.median(contado)) if contado else None,
+        "cuota_mediana": round(statistics.median(cuotas)) if cuotas else None,
+        "contado_casos": len(contado),
+        "cuota_casos": len(cuotas),
+        "potencial_contado": round(sum(con_visita_contado)),
+        "potencial_contado_casos": len(con_visita_contado),
+        "fuera_de_presupuesto": sum(1 for f in fichas if f.get("fuera_de_presupuesto")),
+    }
+
+
+def _horarios(eventos_del_rango: list[dict]) -> list[list[int]]:
+    """Mensajes de clientes por día de la semana (lunes=0) y hora: cuándo escriben."""
+    grilla = [[0] * 24 for _ in range(7)]
+    tz = zona()
+    for e in eventos_del_rango:
+        if e["tipo"] == "mensaje" and e["actor"] == "cliente":
+            momento = datetime.fromtimestamp(e["momento"], tz)
+            grilla[momento.weekday()][momento.hour] += 1
+    return grilla
+
+
+def _primer_humano_despues(evs: list[dict], momento: float) -> dict | None:
+    return next(
+        (
+            e
+            for e in evs
+            if e["tipo"] == "mensaje" and e["actor"] == "humano" and e["momento"] >= momento
+        ),
+        None,
+    )
+
+
+def _acciones(leads: list[dict], por_conv: dict, ahora: float) -> dict:
+    """Lo que el equipo tiene que hacer HOY, sin importar el rango elegido.
+
+    - Visitas por confirmar: agendadas (próximas o de hoy) sin que nadie del
+      equipo le haya escrito al cliente después.
+    - Derivaciones sin respuesta: la IA pasó el cliente a ventas y nadie le
+      escribió todavía.
+    - Calificados para recontactar: dieron forma de pago y presupuesto, no
+      agendaron ni se derivaron, y llevan más de 24 h sin escribir.
+    """
+    tz = zona()
+    hoy = datetime.now(tz).date()
+    limite = ahora - 60 * UN_DIA  # más viejo que esto ya no es «para hoy»
+    visitas, derivaciones, recontactar = [], [], []
+    for lead in leads:
+        conv = lead["conversacion"]
+        evs = sorted(por_conv.get(conv, []), key=lambda e: e["momento"])
+        base = {
+            "conversacion": conv,
+            "nombre": lead.get("nombre") or "Sin nombre",
+            "telefono": lead.get("telefono") or "",
+            "proyecto": _titulo(lead["proyecto"]) if lead.get("proyecto") else "",
+        }
+        if lead.get("descartado_en"):
+            continue
+
+        if lead.get("visita") and lead.get("visita_en"):
+            try:
+                cuando = datetime.strptime(lead["visita"][:16], "%Y-%m-%d %H:%M").date()
+            except ValueError:
+                cuando = None
+            if cuando and cuando >= hoy and not _primer_humano_despues(evs, float(lead["visita_en"])):
+                visitas.append({**base, "visita": lead["visita"], "dias": (cuando - hoy).days})
+
+        if lead.get("derivado_en") and float(lead["derivado_en"]) >= limite:
+            if not _primer_humano_despues(evs, float(lead["derivado_en"])):
+                derivaciones.append(
+                    {
+                        **base,
+                        "motivo": lead.get("derivado_motivo") or "",
+                        "espera": round(ahora - float(lead["derivado_en"])),
+                    }
+                )
+
+        ultimo = float(lead.get("ultimo_mensaje") or lead.get("primer_contacto") or 0)
+        if (
+            _calificado(lead)
+            and not lead.get("visita")
+            and not lead.get("derivado_en")
+            and limite <= ultimo <= ahora - UN_DIA
+        ):
+            monto = (
+                f"USD {float(lead['cuota_usd']):,.0f}/mes" if lead.get("forma_pago") == "plazo" and lead.get("cuota_usd")
+                else f"USD {float(lead.get('presupuesto_usd') or lead.get('cuota_usd') or 0):,.0f}"
+            ).replace(",", ".")
+            recontactar.append(
+                {**base, "monto": monto, "forma_pago": lead.get("forma_pago") or "", "inactivo": round(ahora - ultimo)}
+            )
+
+    visitas.sort(key=lambda x: x["visita"])
+    derivaciones.sort(key=lambda x: -x["espera"])
+    recontactar.sort(key=lambda x: x["inactivo"])
+    return {"visitas": visitas, "derivaciones": derivaciones, "recontactar": recontactar}
+
+
+def _calidad_de_atencion(fichas: list[dict], por_conv: dict, inicio: float, fin: float) -> dict:
+    """Automatización y cumplimiento de tiempos (SLA) del equipo."""
+    solo_ia = sum(1 for f in fichas if f["mensajes"].get("ia") and not f["mensajes"].get("humano"))
+    con_respuesta = sum(1 for f in fichas if f["mensajes"].get("ia") or f["mensajes"].get("humano"))
+    a_tiempo = total = 0
+    visitas = confirmadas = 0
+    for evs in por_conv.values():
+        evs = sorted(evs, key=lambda e: e["momento"])
+        for e in evs:
+            if not (inicio <= e["momento"] < fin):
+                continue
+            if e["tipo"] == "derivacion":
+                total += 1
+                r = _primer_humano_despues(evs, e["momento"])
+                if r and r["momento"] - e["momento"] <= 3600:
+                    a_tiempo += 1
+            elif e["tipo"] == "visita_agendada":
+                visitas += 1
+                if _primer_humano_despues(evs, e["momento"]):
+                    confirmadas += 1
+    return {
+        "automatizacion": _pct(solo_ia, con_respuesta),
+        "solo_ia": solo_ia,
+        "sla_derivacion_1h": _pct(a_tiempo, total),
+        "derivaciones": total,
+        "visitas_confirmadas": _pct(confirmadas, visitas),
+        "visitas": visitas,
+    }
 
 
 def _calificado(f: dict) -> bool:

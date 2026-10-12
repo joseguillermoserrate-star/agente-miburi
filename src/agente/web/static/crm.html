@@ -28,6 +28,8 @@
   --critical: #d03b3b;
   --accent: #1c5cab;
   --accent-ink: #ffffff;
+  --good-ink: #006300;
+  --seq-1: #cde2fb; --seq-2: #9ec5f4; --seq-3: #6da7ec; --seq-4: #3987e5; --seq-5: #256abf; --seq-6: #184f95;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -48,6 +50,8 @@
     --ord-3: #5598e7;
     --accent: #6da7ec;
     --accent-ink: #0b0b0b;
+    --good-ink: #3cc13c;
+    --seq-1: #104281; --seq-2: #184f95; --seq-3: #256abf; --seq-4: #3987e5; --seq-5: #6da7ec; --seq-6: #b7d3f6;
   }
 }
 :root[data-theme="dark"] {
@@ -55,7 +59,8 @@
   --page: #121211; --surface-1: #1a1a19; --surface-2: #232321; --border: #2f2f2c;
   --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #94938b; --grid: #2b2b29;
   --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70;
-  --ord-1: #184f95; --ord-2: #256abf; --ord-3: #5598e7; --accent: #6da7ec; --accent-ink: #0b0b0b;
+  --ord-1: #184f95; --ord-2: #256abf; --ord-3: #5598e7; --accent: #6da7ec; --accent-ink: #0b0b0b; --good-ink: #3cc13c;
+  --seq-1: #104281; --seq-2: #184f95; --seq-3: #256abf; --seq-4: #3987e5; --seq-5: #6da7ec; --seq-6: #b7d3f6;
 }
 * { box-sizing: border-box; }
 body {
@@ -129,6 +134,39 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
 }
 .controles-tabla input { flex: 1 1 200px; }
 a { color: var(--accent); }
+.g2b { grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); }
+.g5 { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.periodo { color: var(--text-muted); font-size: 12.5px; margin: 0 0 10px; }
+.delta { font-size: 12px; font-weight: 600; margin-top: 6px; }
+.delta.sube { color: var(--good-ink); }
+.delta.baja { color: var(--critical); }
+.delta.igual { color: var(--text-muted); font-weight: 500; }
+.lectura { margin-top: 12px; padding: 10px 12px; background: var(--surface-2); border-radius: 8px; font-size: 13px; color: var(--text-secondary); }
+.lectura:empty { display: none; }
+.lectura b { color: var(--text-primary); font-weight: 600; }
+.accion h3 { font-size: 13px; margin: 0 0 8px; display: flex; align-items: center; gap: 8px; }
+.accion h3 .cuenta { font-variant-numeric: tabular-nums; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 0 8px; font-size: 12px; }
+.accion h3 .cuenta.alerta { background: var(--critical); border-color: var(--critical); color: #fff; }
+.accion ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.accion li { font-size: 13px; border-left: 3px solid var(--border); padding: 2px 0 2px 9px; }
+.accion li .meta { color: var(--text-muted); font-size: 12px; }
+.accion .nada { color: var(--text-muted); font-size: 13px; }
+.accion .nada::before { content: "✓ "; color: var(--good-ink); font-weight: 700; }
+.encabezado-tarjeta { display: flex; flex-wrap: wrap; gap: 10px 16px; justify-content: space-between; align-items: flex-start; }
+.encabezado-tarjeta > div:first-child { flex: 1 1 320px; }
+.segmentado { display: flex; flex-wrap: wrap; gap: 4px; background: var(--surface-2); padding: 3px; border-radius: 10px; }
+.segmentado button { border: 0; background: none; padding: 5px 10px; border-radius: 7px; font-size: 13px; color: var(--text-secondary); }
+.segmentado button.activo { background: var(--surface-1); color: var(--text-primary); box-shadow: 0 1px 2px rgba(0,0,0,.12); font-weight: 600; }
+.celda-barra { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.celda-barra .mini { width: 70px; height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; flex: none; }
+.celda-barra .mini span { display: block; height: 100%; background: var(--series-1); border-radius: 0 4px 4px 0; }
+.mapa-scroll { overflow-x: auto; }
+.mapa { display: grid; grid-template-columns: 34px repeat(24, minmax(18px, 1fr)); gap: 2px; min-width: 560px; font-size: 11px; }
+.mapa .eti { color: var(--text-muted); display: flex; align-items: center; }
+.mapa .hora { color: var(--text-muted); text-align: center; }
+.mapa .celda { height: 22px; border-radius: 3px; background: var(--surface-2); }
+.mapa-leyenda { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-muted); margin-top: 8px; }
+.mapa-leyenda span { width: 18px; height: 10px; border-radius: 2px; display: inline-block; }
 .error { background: color-mix(in srgb, var(--critical) 12%, var(--surface-1)); border: 1px solid var(--critical); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; display: none; }
 .dos-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 22px; }
 @media (max-width: 640px) {
@@ -165,17 +203,25 @@ a { color: var(--accent); }
 
   <!-- VISIÓN GENERAL -->
   <section class="vista activa" id="vista-general">
-    <div class="grilla g4" id="kpis-general"></div>
+    <p class="periodo" id="periodo"></p>
+    <div class="grilla g5" id="kpis-general"></div>
+
+    <div class="tarjeta acciones" style="margin-top:12px">
+      <h2>Acciones para hoy</h2>
+      <p class="ayuda">Lo que el equipo tiene que hacer ahora, sin importar el rango de fechas elegido. Cada nombre abre la conversación.</p>
+      <div class="grilla g3" id="acciones"></div>
+    </div>
 
     <div class="grilla g2" style="margin-top:12px">
       <div class="tarjeta embudo">
         <h2>Embudo del agente</h2>
-        <p class="ayuda">De los leads que escribieron en el período, cuántos se calificaron y cuántos pidieron visita o se derivaron a ventas.</p>
+        <p class="ayuda">De los leads que escribieron en el período: cuántos se calificaron y cuántos avanzaron a visita o a ventas. Entre etapas, la tasa de paso.</p>
         <div class="barras" id="embudo"></div>
+        <div class="lectura" id="lectura-embudo"></div>
       </div>
       <div class="tarjeta">
         <h2>Reporte por agente: IA o humano</h2>
-        <p class="ayuda">Quién atendió en el período. El tiempo de respuesta de un humano se mide desde la derivación, la visita o la asignación.</p>
+        <p class="ayuda">Quién atendió en el período. El tiempo de un humano se mide desde la derivación, la visita o la asignación.</p>
         <div class="tabla-scroll" id="tabla-agentes"></div>
       </div>
     </div>
@@ -193,41 +239,51 @@ a { color: var(--accent); }
 
   <!-- CALIDAD COMERCIAL -->
   <section class="vista" id="vista-calidad">
-    <div class="grilla g4" id="kpis-calidad"></div>
-    <div class="grilla g2" style="margin-top:12px">
-      <div class="tarjeta">
-        <h2>Leads por proyecto</h2>
-        <p class="ayuda">Proyecto que consultó o visitará.</p>
-        <div class="barras" id="por-proyecto"></div>
+    <div class="grilla g5" id="kpis-calidad"></div>
+
+    <div class="tarjeta" style="margin-top:12px">
+      <div class="encabezado-tarjeta">
+        <div>
+          <h2>Conversión por segmento</h2>
+          <p class="ayuda">No alcanza con cuántos leads trae cada fuente: lo que importa es cuántos llegan a visita o a ventas. Úselo para decidir dónde invertir en anuncios y qué proyecto empujar.</p>
+        </div>
+        <div class="segmentado" id="selector-segmento" role="tablist">
+          <button data-seg="origen" class="activo">Origen</button>
+          <button data-seg="campana">Campaña</button>
+          <button data-seg="proyecto">Proyecto</button>
+          <button data-seg="motivo">Para qué compran</button>
+          <button data-seg="forma_pago">Forma de pago</button>
+        </div>
       </div>
+      <div class="tabla-scroll" id="tabla-segmentos"></div>
+      <div class="lectura" id="lectura-segmentos"></div>
+    </div>
+
+    <div class="grilla g2b" style="margin-top:12px">
       <div class="tarjeta">
-        <h2>Origen de los leads</h2>
-        <p class="ayuda">Anuncio de Meta (clic a WhatsApp) o WhatsApp directo.</p>
-        <div class="barras" id="por-origen"></div>
-        <div id="campanas-bloque" style="margin-top:14px"></div>
+        <h2>¿Qué presupuesto trae la gente?</h2>
+        <p class="ayuda">Cuánto dicen tener los que compran al contado y cuánto pueden pagar por mes los que compran a plazo. Si muchos quedan por debajo del lote más barato, hay demanda sin producto.</p>
+        <div class="ayuda" style="margin-bottom:6px" id="titulo-contado">Al contado</div>
+        <div class="barras" id="tramos-contado"></div>
+        <div class="ayuda" style="margin:14px 0 6px" id="titulo-cuota">A plazo (cuota mensual)</div>
+        <div class="barras" id="tramos-cuota"></div>
       </div>
       <div class="tarjeta">
         <h2>Calificados y «malos»</h2>
         <p class="ayuda">Malos: descartados, fuera de presupuesto o sin respuesta por más de 24 h.</p>
         <div class="barras" id="calidad-barras"></div>
+        <div class="ayuda" style="margin:14px 0 6px">Motivos de descarte</div>
+        <div class="barras" id="por-descarte"></div>
       </div>
       <div class="tarjeta">
-        <h2>Derivaciones y visitas</h2>
-        <p class="ayuda">Por qué se derivó a ventas y a qué proyecto van las visitas.</p>
-        <div class="ayuda" style="margin-bottom:6px">Motivo de derivación</div>
+        <h2>Derivaciones a ventas</h2>
+        <p class="ayuda">Por qué la IA le pasó el cliente al ejecutivo.</p>
         <div class="barras" id="por-derivacion"></div>
-        <div class="ayuda" style="margin:14px 0 6px">Visitas por proyecto</div>
+      </div>
+      <div class="tarjeta">
+        <h2>Visitas por proyecto</h2>
+        <p class="ayuda">A qué proyecto van las visitas agendadas en el período.</p>
         <div class="barras" id="visitas-proyecto"></div>
-      </div>
-      <div class="tarjeta">
-        <h2>Para qué compran</h2>
-        <p class="ayuda">Inversión (resguardo de valor) o vivienda (dejar de alquilar).</p>
-        <div class="barras" id="por-motivo"></div>
-      </div>
-      <div class="tarjeta">
-        <h2>Forma de pago</h2>
-        <p class="ayuda">Lo que eligió en la conversación.</p>
-        <div class="barras" id="por-forma"></div>
       </div>
     </div>
   </section>
@@ -235,6 +291,15 @@ a { color: var(--accent); }
   <!-- PRODUCTIVIDAD -->
   <section class="vista" id="vista-productividad">
     <div class="grilla g4" id="kpis-productividad"></div>
+    <div class="grilla g4" id="kpis-productividad-2" style="margin-top:12px"></div>
+
+    <div class="tarjeta" style="margin-top:12px">
+      <h2>¿Cuándo escriben los clientes?</h2>
+      <p class="ayuda">Mensajes de clientes por día y hora (hora de Bolivia). Úselo para decidir en qué horarios tiene que estar disponible el ejecutivo.</p>
+      <div class="mapa-scroll"><div id="mapa-horarios"></div></div>
+      <div class="lectura" id="lectura-horarios"></div>
+    </div>
+
     <div class="tarjeta" style="margin-top:12px">
       <h2>Mensajes por día: cliente, IA y equipo</h2>
       <div class="leyenda">
@@ -409,16 +474,79 @@ a { color: var(--accent); }
     });
   }
 
-  function pintar() {
-    var g = datos.general, c = datos.calidad, p = datos.productividad;
+  // -- Ayudas de lectura ---------------------------------------------------
+  function fechaCorta(iso) { var p = iso.split("-"); return p[2] + "/" + p[1]; }
 
-    // Visión general
+  // Variación contra el período anterior. "pp" = puntos porcentuales (para tasas).
+  function delta(actual, anterior, tipo, menosEsMejor) {
+    if (anterior == null) return "";
+    var dif, texto;
+    if (tipo === "pp") {
+      dif = Math.round((actual - anterior) * 10) / 10;
+      texto = (dif > 0 ? "+" : "") + dif.toLocaleString("es-BO") + " pp";
+    } else {
+      if (!anterior) return actual ? '<div class="delta igual">sin datos del período anterior</div>' : "";
+      dif = Math.round(100 * (actual - anterior) / anterior);
+      texto = (dif > 0 ? "+" : "") + dif + "%";
+    }
+    if (!dif) return '<div class="delta igual">= igual que el período anterior</div>';
+    var mejor = menosEsMejor ? dif < 0 : dif > 0;
+    return '<div class="delta ' + (mejor ? "sube" : "baja") + '">' + (dif > 0 ? "▲ " : "▼ ") + texto +
+      ' <span style="font-weight:400;color:var(--text-muted)">vs período anterior</span></div>';
+  }
+  function kpiD(titulo, valor, sub, d) {
+    return '<div class="tarjeta kpi"><div class="titulo">' + esc(titulo) + '</div><div class="valor">' + valor +
+      '</div><div class="sub">' + (sub || "&nbsp;") + "</div>" + (d || "") + "</div>";
+  }
+  function enlace(conv, nombre) {
+    return datos.chatwoot ? '<a href="' + esc(datos.chatwoot + conv) + '" target="_blank" rel="noopener">' + esc(nombre) + "</a>" : esc(nombre);
+  }
+  function lista(titulo, items, alerta, render, vacio) {
+    var max = 6;
+    var html = '<div class="accion"><h3>' + esc(titulo) + ' <span class="cuenta' + (alerta && items.length ? " alerta" : "") + '">' + items.length + "</span></h3>";
+    if (!items.length) return html + '<div class="nada">' + esc(vacio) + "</div></div>";
+    html += "<ul>" + items.slice(0, max).map(render).join("") + "</ul>";
+    if (items.length > max) html += '<div class="ayuda" style="margin-top:6px">y ' + (items.length - max) + " más</div>";
+    return html + "</div>";
+  }
+
+  function pintar() {
+    var g = datos.general, c = datos.calidad, p = datos.productividad, a = datos.comparativo;
+    var pres = datos.presupuestos;
+
+    $("periodo").textContent = "Período " + fechaCorta(datos.rango.desde) + " al " + fechaCorta(datos.rango.hasta) +
+      " · se compara con " + fechaCorta(a.desde) + " al " + fechaCorta(a.hasta);
+
+    // ---- Visión general
     $("kpis-general").innerHTML =
-      kpi("Leads contactados", num(g.leads), num(g.en_conversacion) + " todavía en conversación") +
-      kpi("Calificados", num(g.calificados), pct(g.conversion_calificado) + " de los leads") +
-      kpi("Pidieron visita", num(g.visitas), pct(g.conversion_visita) + " de los leads · " + num(g.reagendadas_en_rango) + " reagendadas") +
-      kpi("Derivados a ventas", num(g.derivados), pct(g.conversion_derivacion) + " de los leads · a " + esc(datos.ejecutivo));
-    barras("embudo", datos.embudo.map(function (e) { return { nombre: e.etapa, valor: e.valor }; }), { ordinal: true, pct: true, total: datos.embudo[0].valor });
+      kpiD("Leads contactados", num(g.leads), num(g.en_conversacion) + " todavía en conversación", delta(g.leads, a.leads)) +
+      kpiD("Calificados", num(g.calificados), pct(g.conversion_calificado) + " de los leads", delta(g.conversion_calificado, a.conversion_calificado, "pp")) +
+      kpiD("Pidieron visita", num(g.visitas), pct(g.conversion_visita) + " de los leads", delta(g.conversion_visita, a.conversion_visita, "pp")) +
+      kpiD("Derivados a ventas", num(g.derivados), pct(g.conversion_derivacion) + " de los leads", delta(g.conversion_derivacion, a.conversion_derivacion, "pp")) +
+      kpiD("Tasa de avance", pct(g.conversion_avance), "leads que llegaron a visita o a ventas", delta(g.conversion_avance, a.conversion_avance, "pp"));
+
+    var ac = datos.acciones;
+    $("acciones").innerHTML =
+      lista("Visitas por confirmar", ac.visitas, true, function (x) {
+        var cuando = x.dias === 0 ? "hoy" : x.dias === 1 ? "mañana" : "en " + x.dias + " días";
+        return "<li>" + enlace(x.conversacion, x.nombre) + '<div class="meta">' + esc(x.visita) + " (" + cuando + ")" + (x.proyecto ? " · " + esc(x.proyecto) : "") + "</div></li>";
+      }, "Todas las visitas próximas ya tienen contacto del ejecutivo.") +
+      lista("Derivados sin respuesta", ac.derivaciones, true, function (x) {
+        return "<li>" + enlace(x.conversacion, x.nombre) + '<div class="meta">' + esc(x.motivo || "derivado") + " · esperando hace " + dur(x.espera) + "</div></li>";
+      }, "Ningún cliente derivado está esperando.") +
+      lista("Calificados para recontactar", ac.recontactar, false, function (x) {
+        return "<li>" + enlace(x.conversacion, x.nombre) + '<div class="meta">' + esc(x.forma_pago) + " " + esc(x.monto) + (x.proyecto ? " · " + esc(x.proyecto) : "") + " · sin escribir hace " + dur(x.inactivo) + "</div></li>";
+      }, "No hay calificados quietos: todos avanzaron o siguen hablando.");
+
+    var e = datos.embudo;
+    barras("embudo", e.map(function (x) { return { nombre: x.etapa, valor: x.valor }; }), { ordinal: true, pct: true, total: e[0].valor });
+    var paso1 = e[0].valor ? 100 * e[1].valor / e[0].valor : 0;
+    var paso2 = e[1].valor ? 100 * e[2].valor / e[1].valor : 0;
+    $("lectura-embudo").innerHTML = e[0].valor
+      ? "De contactado a calificado pasa el <b>" + pct(paso1) + "</b>; de calificado a visita o ventas, el <b>" + pct(paso2) + "</b>. " +
+        (paso1 < paso2 ? "El cuello de botella está en <b>calificar</b>: muchos no llegan a decir forma de pago y presupuesto (revise los «sin respuesta»)."
+                       : "El cuello de botella está en <b>cerrar la visita</b>: se califican, pero no agendan (revise «Calificados para recontactar»).")
+      : "";
     tablaAgentes("tabla-agentes");
     grafico("graf-diario", "line", [
       { nombre: "Leads nuevos", clave: "leads", color: "--series-1" },
@@ -426,32 +554,46 @@ a { color: var(--accent); }
       { nombre: "Derivados a ventas", clave: "derivaciones", color: "--series-3" }
     ]);
 
-    // Calidad comercial
+    // ---- Calidad comercial
+    var origenMeta = (datos.segmentos.origen.find(function (o) { return o.nombre === "Anuncio Meta"; }) || {});
     $("kpis-calidad").innerHTML =
-      kpi("Leads calificados", num(c.calificados), pct(g.conversion_calificado) + " de los leads") +
-      kpi("Leads «malos»", num(g.malos), c.malos.map(function (m) { return esc(m.nombre) + ": " + m.valor; }).join(" · ")) +
-      kpi("Desde anuncios de Meta", num((c.por_origen.find(function (o) { return o.nombre === "Anuncio Meta"; }) || {}).valor), "el resto, WhatsApp directo") +
-      kpi("Visitas agendadas", num(g.visitas_agendadas_en_rango), "en el período, para " + esc(datos.ejecutivo));
-    barras("por-proyecto", c.por_proyecto, { pct: true });
-    barras("por-origen", c.por_origen, { pct: true });
-    $("campanas-bloque").innerHTML = c.por_campana.length ? '<div class="ayuda" style="margin-bottom:6px">Campañas</div><div class="barras" id="por-campana"></div>' : "";
-    if (c.por_campana.length) barras("por-campana", c.por_campana);
+      kpiD("Leads calificados", pct(g.conversion_calificado), num(c.calificados) + " de " + num(g.leads) + " leads", delta(g.conversion_calificado, a.conversion_calificado, "pp")) +
+      kpiD("Leads «malos»", pct(g.leads ? 100 * g.malos / g.leads : 0), num(g.malos) + " leads · " + c.malos.map(function (m) { return esc(m.nombre.toLowerCase()) + " " + m.valor; }).join(", "),
+        delta(g.leads ? 100 * g.malos / g.leads : 0, a.leads ? 100 * a.malos / a.leads : null, "pp", true)) +
+      kpiD("Desde anuncios de Meta", num(origenMeta.leads || 0), origenMeta.leads ? pct(origenMeta.avance) + " llegó a visita o ventas" : "todavía sin leads de anuncios") +
+      kpiD("Presupuesto típico (contado)", pres.contado_mediana ? usd(pres.contado_mediana) : "—", "mediana de " + num(pres.contado_casos) + " leads al contado") +
+      kpiD("Cuota típica (plazo)", pres.cuota_mediana ? usd(pres.cuota_mediana) + "/mes" : "—", "mediana de " + num(pres.cuota_casos) + " leads a plazo");
+
+    pintarSegmentos();
+
+    barras("tramos-contado", pres.contado);
+    barras("tramos-cuota", pres.cuota);
+    $("titulo-contado").textContent = "Al contado · " + num(pres.contado_casos) + " leads" +
+      (pres.potencial_contado ? " · USD " + num(pres.potencial_contado) + " en presupuestos de leads con visita o derivados" : "");
+    $("titulo-cuota").textContent = "A plazo, cuota mensual · " + num(pres.cuota_casos) + " leads" +
+      (pres.fuera_de_presupuesto ? " · " + num(pres.fuera_de_presupuesto) + " no encontraron nada en su presupuesto" : "");
+
     var buenos = [{ nombre: "Calificados", valor: c.calificados, color: "var(--good)" }].concat(
       c.malos.map(function (m) { return { nombre: "Malo · " + m.nombre, valor: m.valor, color: "var(--critical)" }; }));
     barras("calidad-barras", buenos.filter(function (x) { return x.valor; }), { pct: true, total: g.leads });
-    barras("por-derivacion", c.derivaciones);
-    barras("visitas-proyecto", c.visitas_por_proyecto);
-    barras("por-motivo", c.por_motivo, { pct: true });
-    barras("por-forma", c.por_forma_pago, { pct: true });
+    barras("por-descarte", c.descartes);
+    barras("por-derivacion", c.derivaciones, { pct: true });
+    barras("visitas-proyecto", c.visitas_por_proyecto, { pct: true });
 
-    // Productividad
-    var d = p.ejecutivo_desde_derivacion, v = p.ejecutivo_desde_visita, a = p.ejecutivo_desde_asignacion;
+    // ---- Productividad
+    var d = p.ejecutivo_desde_derivacion, v = p.ejecutivo_desde_visita, asg = p.ejecutivo_desde_asignacion;
     $("kpis-productividad").innerHTML =
-      kpi("Tiempo medio de conversación", dur(p.duracion_conversacion.promedio), "mediana " + dur(p.duracion_conversacion.mediana) + " · " + num(p.duracion_conversacion.casos) + " conversaciones") +
-      kpi("Respuesta de la IA", dur(p.respuesta_ia.mediana), "mediana · promedio " + dur(p.respuesta_ia.promedio)) +
-      kpi("Ejecutivo, desde la derivación", dur(d.mediana), "mediana · " + num(d.casos) + " respondidas · " + num(d.sin_respuesta) + " sin respuesta") +
-      kpi("Ejecutivo, desde la visita agendada", dur(v.mediana), "mediana · " + num(v.casos) + " confirmadas · " + num(v.sin_respuesta) + " sin contacto") +
-      kpi("Desde la asignación", dur(a.mediana), "mediana · " + num(a.casos) + " respondidas · " + num(a.sin_respuesta) + " sin respuesta");
+      kpiD("Atendidas solo por la IA", pct(p.automatizacion), num(p.solo_ia) + " conversaciones sin intervención humana") +
+      kpiD("Respuesta de la IA", dur(p.respuesta_ia.mediana), "mediana · promedio " + dur(p.respuesta_ia.promedio)) +
+      kpiD("Derivados atendidos en < 1 h", pct(p.sla_derivacion_1h), num(p.derivaciones) + " derivaciones en el período") +
+      kpiD("Visitas confirmadas por el ejecutivo", pct(p.visitas_confirmadas), num(p.visitas) + " visitas agendadas en el período");
+    $("kpis-productividad-2").innerHTML =
+      kpiD("Ejecutivo, desde la derivación", dur(d.mediana), "mediana · " + num(d.casos) + " respondidas · " + num(d.sin_respuesta) + " sin respuesta") +
+      kpiD("Ejecutivo, desde la visita agendada", dur(v.mediana), "mediana · " + num(v.casos) + " contactadas · " + num(v.sin_respuesta) + " sin contacto") +
+      kpiD("Desde la asignación", dur(asg.mediana), "mediana · " + num(asg.casos) + " respondidas · " + num(asg.sin_respuesta) + " sin respuesta") +
+      kpiD("Tiempo medio de conversación", dur(p.duracion_conversacion.mediana), "mediana · " + num(p.duracion_conversacion.casos) + " conversaciones");
+
+    pintarHorarios();
     grafico("graf-mensajes", "bar", [
       { nombre: "Cliente", clave: "mensajes_cliente", color: "--series-1" },
       { nombre: "IA", clave: "mensajes_ia", color: "--series-2" },
@@ -460,6 +602,74 @@ a { color: var(--accent); }
     tablaAgentes("tabla-agentes-2");
 
     tablaLeads();
+  }
+
+  // -- Conversión por segmento -----------------------------------------------
+  var segmento = "origen";
+  try { segmento = localStorage.getItem("crm-segmento") || "origen"; } catch (e) {}
+  document.querySelectorAll("[data-seg]").forEach(function (b) {
+    b.classList.toggle("activo", b.dataset.seg === segmento);
+    b.addEventListener("click", function () {
+      segmento = b.dataset.seg;
+      document.querySelectorAll("[data-seg]").forEach(function (x) { x.classList.toggle("activo", x === b); });
+      try { localStorage.setItem("crm-segmento", segmento); } catch (e) {}
+      if (datos) pintarSegmentos();
+    });
+  });
+  function celda(valor, max) {
+    var ancho = max ? Math.round(100 * valor / max) : 0;
+    return '<td class="n"><div class="celda-barra">' + pct(valor) + '<span class="mini"><span style="width:' + ancho + '%"></span></span></div></td>';
+  }
+  function pintarSegmentos() {
+    var filas = datos.segmentos[segmento] || [];
+    if (!filas.length) { $("tabla-segmentos").innerHTML = '<div class="vacio">Sin datos en el período.</div>'; $("lectura-segmentos").innerHTML = ""; return; }
+    var maxAv = Math.max.apply(null, filas.map(function (f) { return f.avance; })) || 1;
+    $("tabla-segmentos").innerHTML = "<table><thead><tr><th>Segmento</th><th class=n>Leads</th><th class=n>% calificados</th><th class=n>% visita</th><th class=n>% derivados</th><th class=n>% avance (visita o ventas)</th><th class=n>% malos</th></tr></thead><tbody>" +
+      filas.map(function (f) {
+        return "<tr><td>" + esc(f.nombre) + "</td><td class=n>" + num(f.leads) + "</td><td class=n>" + pct(f.calificados) + "</td><td class=n>" + pct(f.visita) +
+          "</td><td class=n>" + pct(f.derivacion) + "</td>" + celda(f.avance, maxAv) + "<td class=n>" + pct(f.malos) + "</td></tr>";
+      }).join("") + "</tbody></table>";
+    // Lectura: el mejor y el peor segmento con volumen suficiente.
+    var con = filas.filter(function (f) { return f.leads >= 3; });
+    if (con.length >= 2) {
+      var orden = con.slice().sort(function (x, y) { return y.avance - x.avance; });
+      var mejor = orden[0], peor = orden[orden.length - 1];
+      $("lectura-segmentos").innerHTML = "Mejor conversión: <b>" + esc(mejor.nombre) + "</b> (" + pct(mejor.avance) + " llega a visita o ventas). " +
+        "Más baja: <b>" + esc(peor.nombre) + "</b> (" + pct(peor.avance) + ")" + (peor.malos >= 40 ? ", con " + pct(peor.malos) + " de leads malos." : ".") +
+        " Solo se comparan segmentos con 3 leads o más.";
+    } else {
+      $("lectura-segmentos").innerHTML = "Hacen falta al menos dos segmentos con 3 leads o más para comparar.";
+    }
+  }
+
+  // -- Mapa de horarios -----------------------------------------------------
+  function pintarHorarios() {
+    var grilla = datos.horarios, dias = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+    var max = 0, total = 0, porHora = new Array(24).fill(0), porDia = new Array(7).fill(0);
+    grilla.forEach(function (fila, d) { fila.forEach(function (n, h) { max = Math.max(max, n); total += n; porHora[h] += n; porDia[d] += n; }); });
+    var pasos = ["--seq-1", "--seq-2", "--seq-3", "--seq-4", "--seq-5", "--seq-6"];
+    var html = '<div class="mapa"><div></div>';
+    for (var h = 0; h < 24; h++) html += '<div class="hora">' + (h % 3 === 0 ? h : "") + "</div>";
+    grilla.forEach(function (fila, d) {
+      html += '<div class="eti">' + dias[d] + "</div>";
+      fila.forEach(function (n, h) {
+        var fondo = n ? "background:var(" + pasos[Math.min(5, Math.floor(5 * n / max))] + ")" : "";
+        html += '<div class="celda" style="' + fondo + '" title="' + dias[d] + " " + h + ":00 · " + n + ' mensajes"></div>';
+      });
+    });
+    html += "</div>";
+    html += '<div class="mapa-leyenda">Menos ' + pasos.map(function (p) { return '<span style="background:var(' + p + ')"></span>'; }).join("") + " Más</div>";
+    $("mapa-horarios").innerHTML = html;
+    if (!total) { $("lectura-horarios").innerHTML = ""; return; }
+    // Las 3 horas consecutivas con más mensajes, y el día con más.
+    var mejorIni = 0, mejorSuma = -1;
+    for (var i = 0; i < 22; i++) { var s3 = porHora[i] + porHora[i + 1] + porHora[i + 2]; if (s3 > mejorSuma) { mejorSuma = s3; mejorIni = i; } }
+    var diaMax = porDia.indexOf(Math.max.apply(null, porDia));
+    var fuera = 0;
+    grilla.forEach(function (fila, d) { fila.forEach(function (n, h2) { if (d === 6 || h2 < 9 || h2 >= 18) fuera += n; }); });
+    $("lectura-horarios").innerHTML = "La franja más activa es de <b>" + mejorIni + ":00 a " + (mejorIni + 3) + ":00</b> (" + pct(100 * mejorSuma / total) +
+      " de los mensajes) y el día con más mensajes es el <b>" + ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"][diaMax] + "</b>. " +
+      "<b>" + pct(100 * fuera / total) + "</b> llega fuera del horario de oficina (antes de 9, después de 18 o domingo): ahí la IA es la única que atiende.";
   }
 
   function tablaLeads() {
