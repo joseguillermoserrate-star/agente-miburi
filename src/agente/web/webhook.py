@@ -350,6 +350,9 @@ def crear_app(
                     await algo_se_rompio(conversacion, e, CAUSA_MODELO, "modelo")
                     return
 
+                # Para el CRM: cuánto costó esta respuesta (en segundo plano).
+                en_segundo_plano(asyncio.to_thread(crm.anotar_consumo_ia, conversacion, respuesta))
+
                 mensajes = partir_respuesta(
                     respuesta.texto, maximo=config.mensajes_por_respuesta
                 )

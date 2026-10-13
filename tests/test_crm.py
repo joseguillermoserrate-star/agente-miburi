@@ -285,3 +285,44 @@ def test_comparativo_acciones_y_segmentos(base):
     assert r["presupuestos"]["contado_mediana"] == 9000
     assert sum(sum(f) for f in r["horarios"]) == 2
     assert r["productividad"]["visitas_confirmadas"] == 0.0
+
+
+def test_costos_del_mes_y_de_la_ia(base, monkeypatch):
+    monkeypatch.setenv("PRECIO_WHATSAPP_MENSAJE", "0.01")
+    ahora = time.time()
+    t = ahora - 600
+    base.lead("1", primer_contacto=t, origen="Anuncio Meta")
+    base.lead("2", primer_contacto=t, origen="WhatsApp directo")
+    for conv in ("1", "2"):
+        base.evento(conv, "mensaje", "cliente", {}, t)
+        base.evento(conv, "mensaje", "ia", {}, t + 10)
+        base.evento(conv, "consumo_ia", "ia", {"entrada": 10000, "salida": 400, "cache": 0}, t + 10)
+    r = armar(base.leads(), base.eventos())
+    k = r["costos"]
+    assert k["mensajes_mes"] == 2
+    assert k["gratis_por_anuncio"] == 1  # el del anuncio, dentro de las 72 h
+    assert k["cuentan_para_cupo"] == 1
+    assert k["costo_whatsapp_mes"] == 0  # dentro de los 1.000 gratis
+    # 2 respuestas x (10.000 x 0,75 + 400 x 3,75) / 1M = 0,018
+    assert abs(k["costo_ia"] - 0.018) < 1e-9
+    assert k["costo_ia_por_lead"] == 0.009
+    assert k["costo_whatsapp_por_lead"] == 0.005
+
+
+def test_suma_los_tokens_de_todo_el_turno():
+    from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+
+    from agente.agente import Respuesta, _sumar_el_turno
+
+    msgs = [
+        HumanMessage("viejo"),
+        AIMessage("", usage_metadata={"input_tokens": 999, "output_tokens": 9, "total_tokens": 1008}),
+        HumanMessage("precio?"),
+        AIMessage("", usage_metadata={"input_tokens": 6000, "output_tokens": 50, "total_tokens": 6050}),
+        ToolMessage("lista", tool_call_id="x"),
+        AIMessage("hola", usage_metadata={"input_tokens": 6500, "output_tokens": 300, "total_tokens": 6800,
+                                          "input_token_details": {"cache_read": 4000}}),
+    ]
+    r = Respuesta(texto="hola", modelo="m", tokens_entrada=6500, tokens_salida=300)
+    _sumar_el_turno(r, msgs)
+    assert (r.tokens_entrada, r.tokens_salida, r.tokens_cache_leidos) == (12500, 350, 4000)

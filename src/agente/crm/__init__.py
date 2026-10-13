@@ -271,6 +271,24 @@ def anotar_descarte(base: Almacen, conversacion: str, motivo: str) -> None:
 
 
 @_seguro
+def anotar_consumo_ia(base: Almacen, conversacion: str, respuesta) -> None:
+    """Los tokens que usó la IA para responder (para el costo por lead)."""
+    if not conversacion:
+        return
+    base.evento(
+        conversacion,
+        "consumo_ia",
+        "ia",
+        {
+            "modelo": getattr(respuesta, "modelo", ""),
+            "entrada": int(getattr(respuesta, "tokens_entrada", 0) or 0),
+            "salida": int(getattr(respuesta, "tokens_salida", 0) or 0),
+            "cache": int(getattr(respuesta, "tokens_cache_leidos", 0) or 0),
+        },
+    )
+
+
+@_seguro
 def borrar(base: Almacen, conversacion: str) -> None:
     base.borrar_conversacion(conversacion)
 

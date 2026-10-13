@@ -115,6 +115,7 @@ def armar(leads: list[dict], eventos: list[dict], desde: str = "", hasta: str = 
             **anterior,
         },
         "acciones": _acciones(leads, por_conv, ahora),
+        "costos": _costos(leads, eventos, fichas, inicio, fin, ahora),
         "segmentos": _segmentos(fichas),
         "presupuestos": _presupuestos(fichas),
         "horarios": _horarios(del_rango),
@@ -386,6 +387,105 @@ def _acciones(leads: list[dict], por_conv: dict, ahora: float) -> dict:
     derivaciones.sort(key=lambda x: -x["espera"])
     recontactar.sort(key=lambda x: x["inactivo"])
     return {"visitas": visitas, "derivaciones": derivaciones, "recontactar": recontactar}
+
+
+def _precio(variable: str, por_defecto: float) -> float:
+    try:
+        return float((os.getenv(variable) or "").replace(",", ".") or por_defecto)
+    except ValueError:
+        return por_defecto
+
+
+VENTANA_ANUNCIO = 72 * 3600  # Meta: 72 h gratis si el cliente llegó por un anuncio con botón a WhatsApp
+GRATIS_POR_MES = 1000  # Meta: mensajes de servicio gratis por número y por mes
+
+
+def _costos(leads: list[dict], eventos: list[dict], fichas: list[dict], inicio: float, fin: float, ahora: float) -> dict:
+    """Cuánto cuesta el agente: WhatsApp (Meta) en el mes y la IA (Gemini) en el rango.
+
+    Precios configurables (USD), por si cambian:
+        PRECIO_WHATSAPP_MENSAJE      por mensaje de servicio pasado el cupo gratis (0.01)
+        PRECIO_IA_ENTRADA            por millón de tokens leídos (0.75)
+        PRECIO_IA_SALIDA             por millón de tokens escritos (3.75)
+        PRECIO_IA_CACHE              por millón de tokens leídos del caché (0.1875)
+    """
+    p_msg = _precio("PRECIO_WHATSAPP_MENSAJE", 0.01)
+    p_in = _precio("PRECIO_IA_ENTRADA", 0.75)
+    p_out = _precio("PRECIO_IA_SALIDA", 3.75)
+    p_cache = _precio("PRECIO_IA_CACHE", p_in / 4)
+
+    lead_de = {l["conversacion"]: l for l in leads}
+
+    def gratis_por_anuncio(e: dict) -> bool:
+        lead = lead_de.get(e["conversacion"]) or {}
+        primero = float(lead.get("primer_contacto") or 0)
+        return lead.get("origen") == "Anuncio Meta" and primero and e["momento"] - primero <= VENTANA_ANUNCIO
+
+    # -- WhatsApp: el mes calendario en curso (así factura Meta)
+    tz = zona()
+    hoy = datetime.now(tz)
+    mes_inicio = datetime(hoy.year, hoy.month, 1, tzinfo=tz).timestamp()
+    if hoy.month == 12:
+        mes_fin = datetime(hoy.year + 1, 1, 1, tzinfo=tz).timestamp()
+    else:
+        mes_fin = datetime(hoy.year, hoy.month + 1, 1, tzinfo=tz).timestamp()
+    enviados_mes = [
+        e for e in eventos
+        if e["tipo"] == "mensaje" and e["actor"] in ("ia", "humano") and mes_inicio <= e["momento"] < mes_fin
+    ]
+    por_anuncio = sum(1 for e in enviados_mes if gratis_por_anuncio(e))
+    cuentan = len(enviados_mes) - por_anuncio
+    cobrables = max(0, cuentan - GRATIS_POR_MES)
+    dias_pasados = max(1.0, (ahora - mes_inicio) / UN_DIA)
+    dias_mes = (mes_fin - mes_inicio) / UN_DIA
+    proyeccion = round(cuentan / dias_pasados * dias_mes)
+    llega_el = None
+    if cuentan and cuentan < GRATIS_POR_MES:
+        dias_hasta = (GRATIS_POR_MES - cuentan) / (cuentan / dias_pasados)
+        cuando = datetime.fromtimestamp(ahora + dias_hasta * UN_DIA, tz)
+        if cuando.timestamp() < mes_fin:
+            llega_el = cuando.strftime("%d/%m")
+
+    # -- IA: en el rango elegido
+    consumo = [e for e in eventos if e["tipo"] == "consumo_ia" and inicio <= e["momento"] < fin]
+    t_in = sum(int(e["detalle"].get("entrada") or 0) for e in consumo)
+    t_out = sum(int(e["detalle"].get("salida") or 0) for e in consumo)
+    t_cache = min(t_in, sum(int(e["detalle"].get("cache") or 0) for e in consumo))
+    costo_ia = ((t_in - t_cache) * p_in + t_cache * p_cache + t_out * p_out) / 1_000_000
+    conv_con_ia = {e["conversacion"] for e in consumo}
+
+    # -- WhatsApp en el rango, a tarifa (sin descontar el cupo gratis): para el costo por lead
+    enviados_rango = [
+        e for e in eventos
+        if e["tipo"] == "mensaje" and e["actor"] in ("ia", "humano") and inicio <= e["momento"] < fin
+    ]
+    pagables_rango = sum(1 for e in enviados_rango if not gratis_por_anuncio(e))
+    costo_wa_tarifa = pagables_rango * p_msg
+    n_leads = len(fichas) or len(conv_con_ia)
+
+    return {
+        "mes": hoy.strftime("%m/%Y"),
+        "mensajes_mes": len(enviados_mes),
+        "gratis_por_anuncio": por_anuncio,
+        "cuentan_para_cupo": cuentan,
+        "cupo_gratis": GRATIS_POR_MES,
+        "cupo_usado_pct": _pct(cuentan, GRATIS_POR_MES),
+        "cobrables_mes": cobrables,
+        "costo_whatsapp_mes": round(cobrables * p_msg, 2),
+        "proyeccion_mes": proyeccion,
+        "proyeccion_costo_whatsapp": round(max(0, proyeccion - GRATIS_POR_MES) * p_msg, 2),
+        "cupo_se_agota_el": llega_el,
+        "respuestas_ia": len(consumo),
+        "tokens_entrada": t_in,
+        "tokens_salida": t_out,
+        "tokens_cache": t_cache,
+        "costo_ia": round(costo_ia, 4),
+        "costo_ia_por_respuesta": round(costo_ia / len(consumo), 5) if consumo else None,
+        "costo_ia_por_lead": round(costo_ia / n_leads, 4) if n_leads and consumo else None,
+        "costo_whatsapp_por_lead": round(costo_wa_tarifa / n_leads, 4) if n_leads else None,
+        "mensajes_por_lead": round(len(enviados_rango) / n_leads, 1) if n_leads else None,
+        "precio_mensaje": p_msg,
+    }
 
 
 def _calidad_de_atencion(fichas: list[dict], por_conv: dict, inicio: float, fin: float) -> dict:

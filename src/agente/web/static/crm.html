@@ -290,7 +290,12 @@ a { color: var(--accent); }
 
   <!-- PRODUCTIVIDAD -->
   <section class="vista" id="vista-productividad">
-    <div class="grilla g4" id="kpis-productividad"></div>
+    <div class="tarjeta">
+      <h2>Costos del agente</h2>
+      <p class="ayuda" id="ayuda-costos">Estimación en vivo. Lo oficial es lo que facturan Meta (WhatsApp Manager → Información) y Google (AI Studio → Uso).</p>
+      <div class="grilla g4" id="kpis-costos"></div>
+    </div>
+    <div class="grilla g4" id="kpis-productividad" style="margin-top:12px"></div>
     <div class="grilla g4" id="kpis-productividad-2" style="margin-top:12px"></div>
 
     <div class="tarjeta" style="margin-top:12px">
@@ -592,6 +597,23 @@ a { color: var(--accent); }
       kpiD("Ejecutivo, desde la visita agendada", dur(v.mediana), "mediana · " + num(v.casos) + " contactadas · " + num(v.sin_respuesta) + " sin contacto") +
       kpiD("Desde la asignación", dur(asg.mediana), "mediana · " + num(asg.casos) + " respondidas · " + num(asg.sin_respuesta) + " sin respuesta") +
       kpiD("Tiempo medio de conversación", dur(p.duracion_conversacion.mediana), "mediana · " + num(p.duracion_conversacion.casos) + " conversaciones");
+
+    var k = datos.costos;
+    var usd2 = function (n) { return n == null ? "—" : "USD " + n.toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+    var aviso = k.cupo_usado_pct >= 80 ? '<div class="delta baja">▲ ' + pct(k.cupo_usado_pct) + " del cupo gratis usado: cargue la tarjeta en Meta</div>"
+              : '<div class="delta igual">' + pct(k.cupo_usado_pct) + " del cupo gratis usado</div>";
+    var porLead = (k.costo_ia_por_lead || 0) + (k.costo_whatsapp_por_lead || 0);
+    $("kpis-costos").innerHTML =
+      kpiD("WhatsApp " + k.mes + ": mensajes del cupo", num(k.cuentan_para_cupo) + " / " + num(k.cupo_gratis),
+        num(k.mensajes_mes) + " enviados · " + num(k.gratis_por_anuncio) + " gratis por venir de anuncios", aviso) +
+      kpiD("Proyección a fin de mes", num(k.proyeccion_mes) + " mensajes",
+        (k.cupo_se_agota_el ? "el cupo gratis se acabaría el " + k.cupo_se_agota_el + " · " : "") + "costo WhatsApp estimado " + usd2(k.proyeccion_costo_whatsapp)) +
+      kpiD("IA (Gemini) en el período", usd2(k.costo_ia),
+        num(k.respuestas_ia) + " respuestas · " + (k.costo_ia_por_respuesta != null ? "USD " + k.costo_ia_por_respuesta.toLocaleString("es-BO", { maximumFractionDigits: 4 }) + " c/u" : "sin datos aún")) +
+      kpiD("Costo por lead", k.costo_ia_por_lead != null || k.costo_whatsapp_por_lead != null ? "USD " + porLead.toLocaleString("es-BO", { maximumFractionDigits: 3 }) : "—",
+        "IA " + (k.costo_ia_por_lead != null ? "USD " + k.costo_ia_por_lead.toLocaleString("es-BO", { maximumFractionDigits: 3 }) : "—") +
+        " + WhatsApp " + (k.costo_whatsapp_por_lead != null ? "USD " + k.costo_whatsapp_por_lead.toLocaleString("es-BO", { maximumFractionDigits: 3 }) : "—") +
+        " (a tarifa, sin el cupo gratis) · " + (k.mensajes_por_lead != null ? k.mensajes_por_lead.toLocaleString("es-BO") + " mensajes por lead" : ""));
 
     pintarHorarios();
     grafico("graf-mensajes", "bar", [

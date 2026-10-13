@@ -207,7 +207,9 @@ class Agente:
             {"messages": [HumanMessage(texto)]},
             config=self._config_hilo(conversacion),
         )
-        return _a_respuesta(salida["messages"][-1], self.config.modelo)
+        respuesta = _a_respuesta(salida["messages"][-1], self.config.modelo)
+        _sumar_el_turno(respuesta, salida["messages"])
+        return respuesta
 
     def responder_en_vivo(
         self, texto: str, conversacion: str = "local"
@@ -372,6 +374,33 @@ def _texto_de(mensaje) -> str:
         )
 
     return ""
+
+
+def _sumar_el_turno(respuesta: Respuesta, mensajes: list) -> None:
+    """Los tokens de TODO el turno, no solo del último mensaje.
+
+    Cuando el agente usa una herramienta, el modelo trabaja dos (o más) veces
+    en la misma respuesta: una para pedir el dato y otra para redactar. Cada
+    vuelta se paga. Se suman todas las que vinieron después del mensaje de la
+    persona.
+    """
+    inicio = 0
+    for i in range(len(mensajes) - 1, -1, -1):
+        if isinstance(mensajes[i], HumanMessage):
+            inicio = i + 1
+            break
+    entrada = salida = cache = 0
+    for m in mensajes[inicio:]:
+        uso = getattr(m, "usage_metadata", None) or {}
+        if not uso:
+            continue
+        entrada += uso.get("input_tokens", 0) or 0
+        salida += uso.get("output_tokens", 0) or 0
+        cache += (uso.get("input_token_details") or {}).get("cache_read", 0) or 0
+    if entrada or salida:
+        respuesta.tokens_entrada = entrada
+        respuesta.tokens_salida = salida
+        respuesta.tokens_cache_leidos = cache
 
 
 def _a_respuesta(mensaje, modelo_por_defecto: str) -> Respuesta:
