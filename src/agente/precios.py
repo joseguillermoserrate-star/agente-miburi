@@ -201,6 +201,9 @@ def consultar_lotes(
             f"(Hay {resto} {'opción' if resto == 1 else 'opciones'} más; "
             "no las menciones salvo que las pida.)"
         )
+    resumen_plazo = _plazos(filas, proyecto, incluir_no_disponibles)
+    if resumen_plazo and forma != "contado":
+        lineas.append(resumen_plazo)
     if forma != "plazo":
         lineas.append(
             "CÓMO PRESENTARLO: por cada lote decí la superficie en m², el PRECIO DE "
@@ -215,6 +218,35 @@ def consultar_lotes(
             "esfuerzo de la empresa y precio final. No hay descuento mayor."
         )
     return "\n".join(lineas)
+
+
+def _plazos(filas: list[dict], proyecto: str, incluir_no_disponibles: bool) -> str:
+    """El plazo máximo de TODA la lista (y por proyecto), no solo de las opciones mostradas.
+
+    Sin esto, si las 2 opciones que encajan tienen 10 años, el modelo contesta
+    «el plazo máximo es 10 años» aunque otro lote tenga 15.
+    """
+    por_proyecto: dict[str, float] = {}
+    for f in filas:
+        if not incluir_no_disponibles and _normal(f.get("estado")) != "disponible":
+            continue
+        if proyecto and not _coincide(proyecto, f.get("proyecto")):
+            continue
+        anios = _numero(f.get("plazo_anios"))
+        if anios:
+            nombre = str(f.get("proyecto") or "?").strip()
+            por_proyecto[nombre] = max(por_proyecto.get(nombre, 0), anios)
+    if not por_proyecto:
+        return ""
+    maximo = max(por_proyecto.values())
+    detalle = ", ".join(f"{p}: hasta {_formato(a)} años" for p, a in sorted(por_proyecto.items()))
+    donde = [p for p, a in por_proyecto.items() if a == maximo]
+    return (
+        f"PLAZO MÁXIMO en la lista{' de ' + proyecto if proyecto else ''}: {_formato(maximo)} años "
+        f"(en {', '.join(donde)}). Por proyecto: {detalle}. Si preguntan por el plazo máximo, "
+        "respondé con ESTO (no con el plazo de las opciones mostradas) y aclará en qué proyecto aplica; "
+        "el plazo puede variar según el lote."
+    )
 
 
 def _anotar_en_el_crm(config, forma, presupuesto, cuota, proyecto, motivo, sin_opciones) -> None:

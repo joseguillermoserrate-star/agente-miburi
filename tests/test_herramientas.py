@@ -121,3 +121,21 @@ def test_el_modelo_recibe_una_descripcion_util():
     assert clima.name == "clima"
     assert "clima" in clima.description.lower()
     assert "lugar" in clima.args
+
+
+def test_el_plazo_maximo_es_el_de_toda_la_lista(monkeypatch):
+    from agente import precios
+
+    filas = [
+        {"proyecto": "Villa Real V", "superficie_m2": 300, "precio_lista_usd": 16500, "plazo_anios": 10,
+         "cuota_inicial_usd": 500, "cuota_mensual_usd": 166, "estado": "Disponible"},
+        {"proyecto": "Villa Real IV", "superficie_m2": 300, "precio_lista_usd": 12000, "plazo_anios": 15,
+         "cuota_inicial_usd": 500, "cuota_mensual_usd": 131, "estado": "Disponible"},
+    ]
+    monkeypatch.setattr(precios, "_traer_filas", lambda: filas)
+    texto = precios.consultar_lotes.invoke(
+        {"forma_de_pago": "plazo", "proyecto": "Villa Real V", "cuota_mensual_maxima_usd": 200}
+    )
+    assert "PLAZO MÁXIMO en la lista de Villa Real V: 10 años" in texto
+    texto = precios.consultar_lotes.invoke({"forma_de_pago": "plazo", "cuota_mensual_maxima_usd": 170})
+    assert "PLAZO MÁXIMO en la lista: 15 años (en Villa Real IV)" in texto
