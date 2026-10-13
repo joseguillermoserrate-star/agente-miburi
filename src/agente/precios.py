@@ -67,36 +67,21 @@ def consultar_lotes(
     motivo_compra: str = "",
     config: RunnableConfig = None,
 ) -> str:
-    """Busca en la lista de precios ACTUALIZADA las opciones de lotes que mejor
-    le encajan a la persona, según cómo quiere pagar y cuánto tiene.
+    """Lotes que encajan con la persona, de la lista de precios ACTUALIZADA.
 
-    Usala SIEMPRE que hables de precios, descuentos, cuotas, plazos o
-    disponibilidad. Nunca inventes un precio ni un descuento: si no está en el
-    resultado de esta herramienta, no lo sabés.
-
-    Devuelve solo unas pocas opciones (las que mejor aprovechan el presupuesto),
-    no la lista completa. Pasale todo lo que la persona ya te dijo.
+    Usala SIEMPRE para precios, descuentos, cuotas, plazos o disponibilidad.
+    Devuelve máximo 2 opciones. Lo que no esté en el resultado, no lo sabés.
 
     Args:
-        forma_de_pago: "contado" o "plazo". Si la persona todavía no lo dijo,
-            dejalo vacío (pero antes preguntáselo).
-        presupuesto_contado_maximo_usd: Para contado: lo máximo que puede pagar,
-            en dólares. 0 = no lo dijo.
-        cuota_mensual_maxima_usd: Para plazo: la cuota mensual máxima que puede
-            pagar, en dólares. 0 = no lo dijo.
-        proyecto: Solo si pregunta por un proyecto puntual, por ejemplo
-            "Villa Real V". Vacío = todos los proyectos.
-        cantidad_de_opciones: Cuántas opciones devolver (1 o 2). Por defecto 2:
-            nunca se muestran más de 2 a la vez.
-        incluir_no_disponibles: True solo si preguntan específicamente por
-            lotes reservados o vendidos.
-        cliente_pide_mejor_precio: True SOLO si la persona, al contado, pidió
-            explícitamente un mejor precio o descuento ("¿me hace un mejor
-            precio?", "¿hay más descuento?", "¿no hay algo más barato?",
-            "está caro"). Nunca lo pongas en True por tu cuenta ni en la
-            primera consulta. Con True aparece el descuento especial.
-        motivo_compra: Para qué busca el terreno, si ya lo sabés: "inversion"
-            o "vivienda". Vacío si no lo sabés. (Es para el reporte de ventas.)
+        forma_de_pago: "contado" o "plazo" (vacío si aún no lo dijo).
+        presupuesto_contado_maximo_usd: Contado: lo máximo que puede pagar en USD (0 = no lo dijo).
+        cuota_mensual_maxima_usd: Plazo: cuota mensual máxima en USD (0 = no lo dijo).
+        proyecto: Solo si pidió uno, ej. "Villa Real V". Vacío = todos.
+        cantidad_de_opciones: 1 o 2 (por defecto 2).
+        incluir_no_disponibles: True solo si pregunta por lotes reservados o vendidos.
+        cliente_pide_mejor_precio: True SOLO si, al contado, pidió explícitamente
+            mejor precio o más descuento. Nunca por tu cuenta.
+        motivo_compra: "inversion" o "vivienda" si lo sabés.
     """
     try:
         filas = _traer_filas()

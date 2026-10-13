@@ -119,8 +119,10 @@ def clima(lugar: str) -> str:
 
 # Lo que el agente tiene atado. Cuando agregues otra herramienta, sumala acá:
 # es la única lista que mira el grafo.
+# `clima` queda disponible pero fuera de la lista: el agente vende lotes, y Meta
+# no permite asistentes de uso general en la API de WhatsApp (además, cada
+# herramienta en la lista se paga en tokens en cada respuesta).
 HERRAMIENTAS = [
-    clima,
     consultar_lotes,
     convertir_a_bolivianos,
     *HERRAMIENTAS_DE_AGENDA,

@@ -110,9 +110,12 @@ def test_el_nombre_completo_no_deja_comas_sueltas():
     assert herramientas._nombre_completo(solo) == "Madrid, España"
 
 
-def test_la_herramienta_esta_en_la_lista_que_mira_el_grafo():
-    """Si no está acá, el modelo no se entera de que existe."""
-    assert clima in HERRAMIENTAS
+def test_el_agente_solo_tiene_herramientas_del_negocio():
+    """Si no está acá, el modelo no se entera de que existe. El clima queda
+    afuera a propósito: el agente vende lotes (política de Meta y costo)."""
+    nombres = {h.name for h in HERRAMIENTAS}
+    assert "consultar_lotes" in nombres and "agendar_visita" in nombres
+    assert clima not in HERRAMIENTAS
 
 
 def test_el_modelo_recibe_una_descripcion_util():
