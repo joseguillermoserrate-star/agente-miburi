@@ -57,10 +57,17 @@ def test_si_el_bcb_falla_no_usa_valores_fijos(monkeypatch):
         raise OSError("sin red")
 
     monkeypatch.setattr(tc, "leer_bcb", falla)
-    monkeypatch.setenv("TIPO_DE_CAMBIO_BOB", "11.73")
     texto = tc.convertir_a_bolivianos.invoke({"montos_usd": [1000]})
-    assert "Bs 11.730" not in texto
     assert "tipo de cambio flexible del Banco Central" in texto
+
+
+def test_usa_el_valor_guardado_en_coolify(monkeypatch):
+    _limpiar(monkeypatch)
+    monkeypatch.setattr(tc, "leer_bcb", lambda: 99.0)
+    monkeypatch.setenv("TIPO_DE_CAMBIO_BOB", "11,73")
+    texto = tc.convertir_a_bolivianos.invoke({"montos_usd": [11550]})
+    assert "Bs 11,73 por dólar" in texto
+    assert "USD 11.550 = Bs 135.482" in texto
 
 
 def test_sin_bcb_ni_respaldo_no_convierte(monkeypatch):

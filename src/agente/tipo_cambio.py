@@ -16,8 +16,10 @@ Si no hay ninguno de los dos, NO se usa ningún valor fijo (para no dar un monto
 desactualizado): el agente dice que por el momento no tiene el tipo de cambio
 actual y que siempre se calcula al tipo de cambio flexible del Banco Central.
 
-Variable de entorno (opcional):
+Variables de entorno (opcionales):
 
+    TIPO_DE_CAMBIO_BOB   el tipo de cambio que guarda el dueño (ej. 11.73). Se
+                         usa si la hoja no tiene el dato, antes que el BCB.
     TIPO_DE_CAMBIO_URL   de dónde leer la tabla (por defecto, la del BCB)
 
 Para probarlo en el servidor:  python probar_tipo_de_cambio.py
@@ -89,6 +91,10 @@ def tipo_de_cambio() -> tuple[float | None, str]:
     de_la_hoja = tipo_de_cambio_de_la_hoja()
     if de_la_hoja:
         return de_la_hoja, "vigente hoy " + _hoy_bolivia()
+    # El valor que el dueño guardó en Coolify (TIPO_DE_CAMBIO_BOB).
+    guardado = _numero(os.getenv("TIPO_DE_CAMBIO_BOB") or "")
+    if guardado and 1 < guardado < 100:
+        return guardado, "vigente"
     return _del_bcb()
 
 
