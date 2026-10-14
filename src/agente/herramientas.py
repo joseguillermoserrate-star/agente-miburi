@@ -33,7 +33,6 @@ from langchain_core.tools import tool
 
 from .agenda import HERRAMIENTAS_DE_AGENDA
 from .precios import consultar_lotes
-from .tipo_cambio import convertir_a_bolivianos
 from .crm.herramientas import HERRAMIENTAS_DEL_CRM
 
 GEOCODING = "https://geocoding-api.open-meteo.com/v1/search"
@@ -124,7 +123,6 @@ def clima(lugar: str) -> str:
 # herramienta en la lista se paga en tokens en cada respuesta).
 HERRAMIENTAS = [
     consultar_lotes,
-    convertir_a_bolivianos,
     *HERRAMIENTAS_DE_AGENDA,
     *HERRAMIENTAS_DEL_CRM,
 ]

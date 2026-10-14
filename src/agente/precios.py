@@ -32,6 +32,7 @@ descuentos, así nunca queda desactualizado respecto del precio de lista.
 from __future__ import annotations
 
 import json
+import re
 import logging
 import os
 import threading
@@ -62,6 +63,8 @@ def consultar_lotes(
     cuota_mensual_maxima_usd: float = 0,
     proyecto: str = "",
     cantidad_de_opciones: int = OPCIONES_POR_DEFECTO,
+    presupuesto_contado_maximo_bs: float = 0,
+    cuota_mensual_maxima_bs: float = 0,
     incluir_no_disponibles: bool = False,
     cliente_pide_mejor_precio: bool = False,
     motivo_compra: str = "",
@@ -76,6 +79,8 @@ def consultar_lotes(
         forma_de_pago: "contado" o "plazo" (vacío si aún no lo dijo).
         presupuesto_contado_maximo_usd: Contado: lo máximo que puede pagar en USD (0 = no lo dijo).
         cuota_mensual_maxima_usd: Plazo: cuota mensual máxima en USD (0 = no lo dijo).
+        presupuesto_contado_maximo_bs: Igual, pero si lo dijo en BOLIVIANOS (no lo conviertas vos).
+        cuota_mensual_maxima_bs: Igual, pero si lo dijo en BOLIVIANOS (no la conviertas vos).
         proyecto: Solo si pidió uno, ej. "Villa Real V". Vacío = todos.
         cantidad_de_opciones: 1 o 2 (por defecto 2).
         incluir_no_disponibles: True solo si pregunta por lotes reservados o vendidos.
@@ -102,10 +107,13 @@ def consultar_lotes(
     else:
         forma = ""
     # Si dio un monto, la forma de pago se deduce del monto.
-    if not forma and presupuesto_contado_maximo_usd and not cuota_mensual_maxima_usd:
+    if not forma and (presupuesto_contado_maximo_usd or presupuesto_contado_maximo_bs) and not (cuota_mensual_maxima_usd or cuota_mensual_maxima_bs):
         forma = "contado"
-    if not forma and cuota_mensual_maxima_usd and not presupuesto_contado_maximo_usd:
+    if not forma and (cuota_mensual_maxima_usd or cuota_mensual_maxima_bs) and not (presupuesto_contado_maximo_usd or presupuesto_contado_maximo_bs):
         forma = "plazo"
+    en_bs = bool(presupuesto_contado_maximo_bs or cuota_mensual_maxima_bs) and not (
+        presupuesto_contado_maximo_usd or cuota_mensual_maxima_usd
+    )
 
     cantidad = max(1, min(int(cantidad_de_opciones or OPCIONES_POR_DEFECTO), OPCIONES_MAXIMAS))
 
@@ -121,6 +129,15 @@ def consultar_lotes(
             f"Proyectos que existen en la lista: {', '.join(proyectos) or 'ninguno'}."
         )
 
+    if en_bs and not any(_numero(f.get("precio_lista_bs")) for f in candidatas):
+        return (
+            "La lista de precios NO tiene montos en bolivianos todavía. No conviertas ni "
+            "estimes: decile que los precios se manejan en dólares y preguntale el monto "
+            "en dólares (o que el ejecutivo le confirma el equivalente en bolivianos)."
+        )
+    if en_bs:
+        candidatas = [f for f in candidatas if _numero(f.get("precio_lista_bs"))]
+
     def contado(f):
         # Con el descuento especial solo si lo pidió: si no, el presupuesto se
         # compara con el precio que de verdad se le va a ofrecer.
@@ -130,32 +147,50 @@ def consultar_lotes(
     def cuota(f):
         return _numero(f.get("cuota_mensual_usd"))
 
+    def contado_bs(f):
+        inicial, especial = _precios_contado(f, "bs")
+        return especial if cliente_pide_mejor_precio else inicial
+
+    def cuota_bs(f):
+        return _numero(f.get("cuota_mensual_bs"))
+
+    # El monto puede venir en dólares o en bolivianos: se compara con la columna
+    # de la misma moneda, sin convertir nada.
+    if presupuesto_contado_maximo_bs and not presupuesto_contado_maximo_usd:
+        presupuesto, contado_cmp, mon = presupuesto_contado_maximo_bs, contado_bs, "Bs"
+    else:
+        presupuesto, contado_cmp, mon = presupuesto_contado_maximo_usd, contado, "USD"
+    if cuota_mensual_maxima_bs and not cuota_mensual_maxima_usd:
+        cuota_max, cuota_cmp, mon_c = cuota_mensual_maxima_bs, cuota_bs, "Bs"
+    else:
+        cuota_max, cuota_cmp, mon_c = cuota_mensual_maxima_usd, cuota, "USD"
+
     encabezado = []
-    if presupuesto_contado_maximo_usd:
-        tope = presupuesto_contado_maximo_usd
-        entran = [f for f in candidatas if contado(f) <= tope]
+    if presupuesto:
+        tope = presupuesto
+        entran = [f for f in candidatas if contado_cmp(f) <= tope]
         # Lo que mejor aprovecha el presupuesto primero: el más cercano por debajo.
-        entran.sort(key=contado, reverse=True)
+        entran.sort(key=contado_cmp, reverse=True)
         if entran:
             elegidas = entran
-            encabezado.append(f"Opciones al contado que entran en USD {_formato(tope)}:")
+            encabezado.append(f"Opciones al contado que entran en {mon} {_formato(tope)}:")
         else:
-            elegidas = sorted(candidatas, key=contado)
+            elegidas = sorted(candidatas, key=contado_cmp)
             encabezado.append(
-                f"NINGUNA opción entra en USD {_formato(tope)} al contado. Estas son "
+                f"NINGUNA opción entra en {mon} {_formato(tope)} al contado. Estas son "
                 "las más cercanas: decíselo con tacto y, si le sirve, ofrecé el plan a plazo."
             )
-    elif cuota_mensual_maxima_usd:
-        tope = cuota_mensual_maxima_usd
-        entran = [f for f in candidatas if cuota(f) <= tope]
-        entran.sort(key=cuota, reverse=True)
+    elif cuota_max:
+        tope = cuota_max
+        entran = [f for f in candidatas if cuota_cmp(f) <= tope]
+        entran.sort(key=cuota_cmp, reverse=True)
         if entran:
             elegidas = entran
-            encabezado.append(f"Opciones a plazo con cuota de hasta USD {_formato(tope)} por mes:")
+            encabezado.append(f"Opciones a plazo con cuota de hasta {mon_c} {_formato(tope)} por mes:")
         else:
-            elegidas = sorted(candidatas, key=cuota)
+            elegidas = sorted(candidatas, key=cuota_cmp)
             encabezado.append(
-                f"NINGUNA opción tiene cuota de hasta USD {_formato(tope)}. Estas son "
+                f"NINGUNA opción tiene cuota de hasta {mon_c} {_formato(tope)}. Estas son "
                 "las más cercanas: decíselo con tacto."
             )
     else:
@@ -170,11 +205,12 @@ def consultar_lotes(
         )
 
     unicas = list(dict.fromkeys(_redactar(f, forma, cliente_pide_mejor_precio) for f in elegidas))
+    cambio = _cambio_de_la_lista(filas)
     _anotar_en_el_crm(
         config,
         forma,
-        presupuesto_contado_maximo_usd,
-        cuota_mensual_maxima_usd,
+        presupuesto_contado_maximo_usd or (presupuesto_contado_maximo_bs / cambio if cambio else 0),
+        cuota_mensual_maxima_usd or (cuota_mensual_maxima_bs / cambio if cambio else 0),
         proyecto,
         motivo_compra,
         sin_opciones=bool(encabezado and encabezado[0].startswith("NINGUNA")),
@@ -185,6 +221,18 @@ def consultar_lotes(
         lineas.append(
             f"(Hay {resto} {'opción' if resto == 1 else 'opciones'} más; "
             "no las menciones salvo que las pida.)"
+        )
+    if any(_numero(f.get("precio_lista_bs")) for f in elegidas[:cantidad]):
+        lineas.append(
+            "BOLIVIANOS: los montos en Bs vienen de la lista (no calcules ni estimes otros). "
+            "Dá cada monto en dólares y en bolivianos, y aclará SIEMPRE: «Actualmente los "
+            "montos en bolivianos se manejan con el tipo de cambio del Banco Central, que "
+            "se ajusta todos los días.»"
+        )
+    elif not any(_numero(f.get("precio_lista_bs")) for f in filas):
+        lineas.append(
+            "Esta lista no tiene montos en bolivianos: si los piden, no los calcules; decí "
+            "que los precios se manejan en dólares y que el ejecutivo le confirma el equivalente."
         )
     resumen_plazo = _plazos(filas, proyecto, incluir_no_disponibles)
     if resumen_plazo and forma != "contado":
@@ -328,12 +376,26 @@ def tipo_de_cambio_de_la_hoja() -> float:
     return valor if 1 < valor < 100 else 0.0
 
 
-def _precios_contado(f: dict) -> tuple[float, float]:
-    """(precio con descuento inicial, precio con descuento máximo)."""
-    lista = _numero(f.get("precio_lista_usd"))
+def _precios_contado(f: dict, moneda: str = "usd") -> tuple[float, float]:
+    """(precio con descuento inicial, precio con descuento máximo), en esa moneda."""
+    lista = _numero(f.get(f"precio_lista_{moneda}"))
     inicial = _porcentaje(f.get("descuento_contado_inicial"))
     maximo = _porcentaje(f.get("descuento_contado_maximo")) or inicial
     return lista * (1 - inicial), lista * (1 - maximo)
+
+
+def _bs(f: dict, valor_bs: float) -> str:
+    """« (Bs 193.545)» si la hoja tiene el monto en bolivianos; si no, nada."""
+    return f" (Bs {_formato(valor_bs)})" if valor_bs else ""
+
+
+def _cambio_de_la_lista(filas: list[dict]) -> float:
+    """Bs por dólar que usa la hoja (precio en Bs / precio en USD). Solo para el CRM."""
+    for f in filas:
+        usd, bs = _numero(f.get("precio_lista_usd")), _numero(f.get("precio_lista_bs"))
+        if usd and bs:
+            return bs / usd
+    return 0.0
 
 
 def _redactar(f: dict, forma: str = "", mejor_precio: bool = False) -> str:
@@ -346,32 +408,36 @@ def _redactar(f: dict, forma: str = "", mejor_precio: bool = False) -> str:
     inicial = _porcentaje(f.get("descuento_contado_inicial"))
     maximo = _porcentaje(f.get("descuento_contado_maximo")) or inicial
     contado_inicial, contado_maximo = _precios_contado(f)
+    lista_bs = _numero(f.get("precio_lista_bs"))
+    contado_inicial_bs, contado_maximo_bs = _precios_contado(f, "bs")
 
     partes = [f"- {f.get('proyecto', '?')}"]
     if f.get("ubicacion"):
         partes.append(str(f.get("ubicacion")))
     partes.append(f"superficie {_formato(f.get('superficie_m2'))} m²")
     if forma != "plazo":
-        partes.append(f"PRECIO DE LISTA USD {_formato(lista)}")
+        partes.append(f"PRECIO DE LISTA USD {_formato(lista)}{_bs(f, lista_bs)}")
         if inicial:
             partes.append(
                 f"al contado tiene {_pct(inicial)} de descuento, quedando en "
-                f"USD {_formato(contado_inicial)}"
+                f"USD {_formato(contado_inicial)}{_bs(f, contado_inicial_bs)}"
             )
         # El descuento especial no se le muestra al modelo hasta que la
         # persona lo pide: lo que el modelo no ve, no lo puede regalar.
         if mejor_precio and maximo > inicial:
             partes.append(
                 f"PRECIO ESPECIAL (porque pidió mejor precio): {_pct(maximo)} de "
-                f"descuento, quedando en USD {_formato(contado_maximo)}. Es el precio final."
+                f"descuento, quedando en USD {_formato(contado_maximo)}{_bs(f, contado_maximo_bs)}. "
+                "Es el precio final."
             )
     if forma != "contado" and f.get("plazo_anios"):
         if forma == "plazo":
-            partes.append(f"precio de lista USD {_formato(lista)}")
+            partes.append(f"precio de lista USD {_formato(lista)}{_bs(f, lista_bs)}")
         partes.append(
             f"A PLAZO hasta {_formato(f.get('plazo_anios'))} años: cuota inicial USD "
-            f"{_formato(f.get('cuota_inicial_usd'))} y cuota mensual USD "
-            f"{_formato(f.get('cuota_mensual_usd'), 2)} (sin descuento)"
+            f"{_formato(f.get('cuota_inicial_usd'))}{_bs(f, _numero(f.get('cuota_inicial_bs')))} "
+            f"y cuota mensual USD {_formato(f.get('cuota_mensual_usd'), 2)}"
+            f"{_bs(f, _numero(f.get('cuota_mensual_bs')))} (sin descuento)"
         )
     if _normal(f.get("estado")) != "disponible":
         partes.append(f"estado: {f.get('estado', '?')}")
@@ -398,7 +464,8 @@ def _coincide(buscado, valor) -> bool:
 def _numero(valor) -> float:
     if isinstance(valor, (int, float)):
         return float(valor)
-    texto = str(valor or "").replace("$", "").replace("%", "").strip()
+    texto = str(valor or "").replace("$", "").replace("%", "")
+    texto = re.sub(r"(?i)bs\.?|usd|us|\s", "", texto)
     # "1.050,50" (formato boliviano) o "1,050.50" (inglés)
     if "," in texto and "." in texto:
         if texto.rfind(",") > texto.rfind("."):

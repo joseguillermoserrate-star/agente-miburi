@@ -142,3 +142,45 @@ def test_el_plazo_maximo_es_el_de_toda_la_lista(monkeypatch):
     assert "PLAZO MÁXIMO en la lista de Villa Real V: 10 años" in texto
     texto = precios.consultar_lotes.invoke({"forma_de_pago": "plazo", "cuota_mensual_maxima_usd": 170})
     assert "PLAZO MÁXIMO en la lista: 15 años (en Villa Real IV)" in texto
+
+
+FILAS_CON_BS = [
+    {"proyecto": "Villa Real IV", "superficie_m2": 300, "precio_lista_usd": 7800, "precio_lista_bs": 91494,
+     "descuento_contado_inicial": "30%", "descuento_contado_maximo": "35%", "plazo_anios": 10,
+     "cuota_inicial_usd": 210, "cuota_inicial_bs": 2463, "cuota_mensual_usd": 109, "cuota_mensual_bs": 1279,
+     "estado": "Disponible"},
+    {"proyecto": "Villa Real V", "superficie_m2": 300, "precio_lista_usd": 16500, "precio_lista_bs": 193545,
+     "descuento_contado_inicial": "30%", "descuento_contado_maximo": "35%", "plazo_anios": 10,
+     "cuota_inicial_usd": 1050, "cuota_inicial_bs": 12317, "cuota_mensual_usd": 217, "cuota_mensual_bs": 2545,
+     "estado": "Disponible"},
+]
+
+
+def test_cuota_en_bolivianos_se_compara_con_la_columna_en_bolivianos(monkeypatch):
+    from agente import precios
+
+    monkeypatch.setattr(precios, "_traer_filas", lambda: FILAS_CON_BS)
+    texto = precios.consultar_lotes.invoke({"forma_de_pago": "plazo", "cuota_mensual_maxima_bs": 1500})
+    assert "cuota de hasta Bs 1.500" in texto
+    assert "Villa Real IV" in texto and "Villa Real V ·" not in texto
+    assert "cuota mensual USD 109,00 (Bs 1.279)" in texto
+    assert "tipo de cambio del Banco Central, que se ajusta todos los días" in texto
+
+
+def test_contado_muestra_dolares_y_bolivianos_de_la_lista(monkeypatch):
+    from agente import precios
+
+    monkeypatch.setattr(precios, "_traer_filas", lambda: FILAS_CON_BS)
+    texto = precios.consultar_lotes.invoke({"forma_de_pago": "contado", "presupuesto_contado_maximo_usd": 20000})
+    assert "PRECIO DE LISTA USD 16.500 (Bs 193.545)" in texto
+    assert "quedando en USD 11.550 (Bs 135.482)" in texto
+
+
+def test_sin_bolivianos_en_la_hoja_no_inventa(monkeypatch):
+    from agente import precios
+
+    sin_bs = [{k: v for k, v in f.items() if not k.endswith("_bs")} for f in FILAS_CON_BS]
+    monkeypatch.setattr(precios, "_traer_filas", lambda: sin_bs)
+    texto = precios.consultar_lotes.invoke({"forma_de_pago": "plazo", "cuota_mensual_maxima_bs": 1000})
+    assert "NO tiene montos en bolivianos" in texto
+    assert "Bs" not in texto.split("bolivianos")[0] or "No conviertas" in texto
