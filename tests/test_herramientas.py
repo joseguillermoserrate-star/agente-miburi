@@ -165,6 +165,7 @@ def test_cuota_en_bolivianos_se_compara_con_la_columna_en_bolivianos(monkeypatch
     assert "Villa Real IV" in texto and "Villa Real V ·" not in texto
     assert "cuota mensual USD 109,00 (Bs 1.279)" in texto
     assert "tipo de cambio del Banco Central, que se ajusta todos los días" in texto
+    assert "vigentes HOY" in texto
 
 
 def test_contado_muestra_dolares_y_bolivianos_de_la_lista(monkeypatch):

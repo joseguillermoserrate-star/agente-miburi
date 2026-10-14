@@ -224,7 +224,7 @@ def consultar_lotes(
         )
     if any(_numero(f.get("precio_lista_bs")) for f in elegidas[:cantidad]):
         lineas.append(
-            "BOLIVIANOS: los montos en Bs vienen de la lista (no calcules ni estimes otros). "
+            f"BOLIVIANOS (vigentes HOY {_hoy()}): los montos en Bs vienen de la lista (no calcules ni estimes otros). "
             "Dá cada monto en dólares y en bolivianos, y aclará SIEMPRE: «Actualmente los "
             "montos en bolivianos se manejan con el tipo de cambio del Banco Central, que "
             "se ajusta todos los días.»"
@@ -382,6 +382,12 @@ def _precios_contado(f: dict, moneda: str = "usd") -> tuple[float, float]:
     inicial = _porcentaje(f.get("descuento_contado_inicial"))
     maximo = _porcentaje(f.get("descuento_contado_maximo")) or inicial
     return lista * (1 - inicial), lista * (1 - maximo)
+
+
+def _hoy() -> str:
+    from datetime import datetime, timedelta, timezone
+
+    return (datetime.now(timezone.utc) - timedelta(hours=4)).strftime("%d/%m/%Y")
 
 
 def _bs(f: dict, valor_bs: float) -> str:
